@@ -25,9 +25,29 @@ import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.api.Test
 
 import scala.annotation.nowarn
+import java.util.Properties
+import kafka.tools.MirrorMaker.MirrorMakerProducer
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.common.config.SslConfigs
+import org.apache.kafka.common.serialization.ByteArraySerializer
 
 @nowarn("cat=deprecation")
 class MirrorMakerTest {
+
+  @Test
+  def testProducerSslPasswordGenerated(): Unit = {
+    val producerProps = new Properties
+    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9093")
+    producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[ByteArraySerializer])
+    producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[ByteArraySerializer])
+    producerProps.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG + ".generator", "printf cloudera")
+    val producer = new MirrorMakerProducer(true, producerProps)
+
+    try
+      assertEquals("cloudera", producer.producerProps.getProperty(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG))
+    finally
+      producer.close()
+  }
 
   @Test
   def testDefaultMirrorMakerMessageHandler(): Unit = {

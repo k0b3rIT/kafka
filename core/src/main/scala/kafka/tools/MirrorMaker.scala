@@ -22,6 +22,8 @@ import java.util
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.CountDownLatch
 import java.util.{Collections, Properties}
+
+import com.cloudera.kafka.wrap.Kafka._
 import kafka.consumer.BaseConsumerRecord
 import kafka.utils._
 import org.apache.kafka.clients.consumer._
@@ -108,6 +110,10 @@ object MirrorMaker extends Logging {
     // Hardcode the deserializer to ByteArrayDeserializer
     consumerConfigProps.setProperty("key.deserializer", classOf[ByteArrayDeserializer].getName)
     consumerConfigProps.setProperty("value.deserializer", classOf[ByteArrayDeserializer].getName)
+
+    // Generate password from executable
+    consumerConfigProps.asInstanceOf[util.Hashtable[Object, Object]].putAll(generateSslPasswords(consumerConfigProps))
+
     // The default client id is group id, we manually set client id to groupId-index to avoid metric collision
     val groupIdString = consumerConfigProps.getProperty("group.id")
     val consumers = (0 until numStreams) map { i =>
@@ -369,6 +375,9 @@ object MirrorMaker extends Logging {
   }
 
   private[tools] class MirrorMakerProducer(val sync: Boolean, val producerProps: Properties) {
+
+    // Generate password from executable
+    producerProps.asInstanceOf[util.Hashtable[Object, Object]].putAll(generateSslPasswords(producerProps))
 
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 

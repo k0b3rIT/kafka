@@ -17,6 +17,8 @@
 
 package kafka.server
 
+import com.cloudera.kafka.metrics.HttpMetricsReporterExclude
+
 import java.util
 import java.util.{Collections, Properties}
 import java.util.concurrent.CopyOnWriteArrayList
@@ -262,6 +264,7 @@ class DynamicBrokerConfig(private val kafkaConfig: KafkaConfig) extends Logging 
       case Some(authz: Reconfigurable) => addReconfigurable(authz)
       case _ =>
     }
+    addReconfigurable(HttpMetricsReporterExclude.INSTANCE)
     addReconfigurable(kafkaServer.kafkaYammerMetrics)
     addReconfigurable(new DynamicMetricsReporters(kafkaConfig.brokerId, kafkaServer.config, kafkaServer.metrics, kafkaServer.clusterId))
     addReconfigurable(new DynamicClientQuotaCallback(kafkaServer.quotaManagers, kafkaServer.config))

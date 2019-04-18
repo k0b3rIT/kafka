@@ -30,6 +30,8 @@ import org.apache.kafka.connect.runtime.rest.util.SSLUtils;
 
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
+import org.eclipse.jetty.security.ConstraintMapping;
+import org.eclipse.jetty.security.ConstraintSecurityHandler;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Handler;
@@ -43,6 +45,7 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.eclipse.jetty.servlets.HeaderFilter;
+import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.glassfish.hk2.utilities.Binder;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -112,7 +115,6 @@ public abstract class RestServer {
 
         createConnectors(listeners, adminListeners);
     }
-
     /**
      * Adds Jetty connector for each configured listener
      */
@@ -284,6 +286,7 @@ public abstract class RestServer {
             configureHttpResponseHeaderFilter(context, headerConfig);
         }
 
+        disableHttpTrace(contextHandlers, context);
         handlers.setHandlers(contextHandlers.toArray(new Handler[0]));
         try {
             context.start();
@@ -348,6 +351,15 @@ public abstract class RestServer {
      */
     protected void configureAdminResources(ResourceConfig adminResourceConfig) {
         // No-op by default
+    }
+
+    private void disableHttpTrace(List<Handler> contextHandlers, ServletContextHandler context) {
+        context.setSecurityHandler(createSecurityHandlerWithTraceDisabled());
+        contextHandlers.forEach(h -> {
+            if (h instanceof ServletContextHandler) {
+                ((ServletContextHandler) h).setSecurityHandler(createSecurityHandlerWithTraceDisabled());
+            }
+        });
     }
 
     public URI serverUrl() {
@@ -577,4 +589,26 @@ public abstract class RestServer {
             }
         }
     }
+
+    ConstraintSecurityHandler createSecurityHandlerWithTraceDisabled() {
+        ConstraintSecurityHandler constraintSecurityHandler = new ConstraintSecurityHandler();
+        Constraint constraintDisableTrace = new Constraint();
+        constraintDisableTrace.setAuthenticate(true);
+        ConstraintMapping mappingDisableTrace = new ConstraintMapping();
+        mappingDisableTrace.setPathSpec("/");
+        mappingDisableTrace.setMethod("TRACE");
+        mappingDisableTrace.setConstraint(constraintDisableTrace);
+        constraintSecurityHandler.addConstraintMapping(mappingDisableTrace);
+
+        //Need to enable the other methods in the security filter to avoid warnings
+        Constraint constraintEnabledMethods = new Constraint();
+        ConstraintMapping enabledMethodsMapping = new ConstraintMapping();
+        enabledMethodsMapping.setPathSpec("/");
+        enabledMethodsMapping.setMethodOmissions(new String[]{"TRACE"});
+        enabledMethodsMapping.setConstraint(constraintEnabledMethods);
+        constraintSecurityHandler.addConstraintMapping(enabledMethodsMapping);
+
+        return constraintSecurityHandler;
+    }
+
 }

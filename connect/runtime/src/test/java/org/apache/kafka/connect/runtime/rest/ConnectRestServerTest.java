@@ -33,11 +33,13 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpOptions;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpTrace;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,6 +116,54 @@ public class ConnectRestServerTest {
     @Test
     public void testCORSDisabled() throws IOException {
         checkCORSRequest("", "http://bar.com", null, null);
+    }
+
+    @Test
+    public void testTraceDisabled() throws IOException {
+
+        Map<String, String> configMap = baseServerProps();
+
+        doReturn(KAFKA_CLUSTER_ID).when(herder).kafkaClusterId();
+        doReturn(plugins).when(herder).plugins();
+        doReturn(Collections.emptyList()).when(plugins).newPlugins(eq(Collections.emptyList()), any(), eq(ConnectRestExtension.class));
+
+        server = new ConnectRestServer(null, null, configMap);
+        server.initializeServer();
+        server.initializeResources(herder);
+
+        HttpRequest request = new HttpTrace("/");
+
+        try (CloseableHttpClient httpClient = HttpClients.createMinimal()) {
+            HttpHost httpHost = new HttpHost(
+                server.advertisedUrl().getHost(),
+                server.advertisedUrl().getPort()
+            );
+            CloseableHttpResponse response = httpClient.execute(httpHost, request);
+            Assertions.assertEquals(403, response.getStatusLine().getStatusCode());
+        }
+    }
+
+    @Test
+    public void testGetEnabled() throws IOException {
+        Map<String, String> configMap = new HashMap<>(baseServerProps());
+
+        doReturn(KAFKA_CLUSTER_ID).when(herder).kafkaClusterId();
+        doReturn(plugins).when(herder).plugins();
+        doReturn(Collections.emptyList()).when(plugins).newPlugins(eq(Collections.emptyList()), any(), eq(ConnectRestExtension.class));
+
+        server = new ConnectRestServer(null, null, configMap);
+        server.initializeServer();
+        server.initializeResources(herder);
+
+        HttpRequest request = new HttpGet("/");
+        try (CloseableHttpClient httpClient = HttpClients.createMinimal()) {
+            HttpHost httpHost = new HttpHost(
+                server.advertisedUrl().getHost(),
+                server.advertisedUrl().getPort()
+            );
+            CloseableHttpResponse response = httpClient.execute(httpHost, request);
+            Assertions.assertEquals(200, response.getStatusLine().getStatusCode());
+        }
     }
 
     @Test

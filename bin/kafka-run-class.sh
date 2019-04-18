@@ -340,6 +340,13 @@ CLASSPATH=${CLASSPATH#:}
 # If Cygwin is detected, classpath is converted to Windows format.
 (( WINDOWS_OS_FORMAT )) && CLASSPATH=$(cygpath --path --mixed "${CLASSPATH}")
 
+# required for metrics servlet when using java 9 or higher
+# JAVA_MAJOR_VERSION retrieval is the same as above
+JAVA_MAJOR_VERSION=$($JAVA -version 2>&1 | sed -E -n 's/.* version "([0-9]*).*$/\1/p')
+if [[ "$JAVA_MAJOR_VERSION" -ge "9" ]]; then
+  KAFKA_OPTS="$KAFKA_OPTS --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED"
+fi
+
 # If KAFKA_MODE=native, it will bring up Kafka in the native mode.
 # It expects the Kafka executable binary to be present at $base_dir/kafka.Kafka.
 # This is specifically used to run system tests on native Kafka - by bringing up Kafka in the native mode.

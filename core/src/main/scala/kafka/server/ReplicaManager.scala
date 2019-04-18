@@ -629,6 +629,10 @@ class ReplicaManager(val config: KafkaConfig,
     Option(allPartitions.get(topicPartition)).getOrElse(HostedPartition.None)
   }
 
+  def getAllLeaderPartitions(): Set[TopicPartition] = {
+    leaderPartitionsIterator.map(partition => new TopicPartition(partition.topic, partition.partitionId)).toSet
+  }
+
   def isAddingReplica(topicPartition: TopicPartition, replicaId: Int): Boolean = {
     getPartition(topicPartition) match {
       case Online(partition) => partition.isAddingReplica(replicaId)

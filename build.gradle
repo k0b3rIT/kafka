@@ -1175,6 +1175,8 @@ project(':core') {
     from(project(':streams:examples').configurations.runtimeClasspath) { into("libs/") }
     from(project(':tools:tools-api').jar) { into("libs/") }
     from(project(':tools:tools-api').configurations.runtimeClasspath) { into("libs/") }
+    from(project(':metrics-reporter').jar) { into("libs/") }
+    from(project(':metrics-reporter').configurations.runtimeClasspath) { into("libs/") }
     duplicatesStrategy 'exclude'
   }
 
@@ -3057,6 +3059,46 @@ project(':log4j-appender') {
 
 }
 
+project(':metrics-reporter') {
+  apply plugin: 'scala'
+  archivesBaseName = "kafka-cloudera-metrics-reporter_${versions.baseScala}"
+
+  dependencies {
+    // using compileOnly otherwise there'd be circular dependency
+    compileOnly project(':core')
+    compileOnly project(':server')
+    compileOnly project(':server-common')
+    implementation project(':group-coordinator')
+    implementation project(':metadata')
+    implementation libs.jacksonJaxrsJsonProvider
+    implementation libs.jerseyContainerServlet
+    implementation libs.jerseyHk2
+    implementation libs.jettyServer
+    implementation libs.jettyServlet
+    implementation libs.metricsServlet
+    implementation libs.scalaCollectionCompat
+    implementation libs.scalaJava8Compat
+    implementation libs.scalaLogging
+    implementation libs.prometheusServlet
+    implementation libs.prometheusSimpleClient
+    implementation libs.prometheusHotspot
+    implementation libs.prometheusHttpserver
+
+    testImplementation project(':core')
+    testImplementation project(':server')
+    testImplementation project(':server-common')
+    testImplementation project(':core').sourceSets.test.output
+    testImplementation project(':server-common').sourceSets.test.output
+    testImplementation project(':clients').sourceSets.test.output
+    testImplementation libs.junitJupiter
+    testImplementation libs.mockitoCore
+  }
+
+  javadoc {
+    enabled = false
+  }
+}
+
 project(':connect:api') {
   base {
     archivesName = "connect-api"
@@ -3214,6 +3256,9 @@ project(':connect:runtime') {
     // We use this library to generate OpenAPI docs for the REST API, but we don't want or need it at compile
     // or run time. So, we add it to a separate configuration, which we use later on during docs generation
     swagger libs.swaggerJaxrs2
+
+    implementation libs.prometheusServlet
+    implementation libs.prometheusSimpleClient
 
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':core')

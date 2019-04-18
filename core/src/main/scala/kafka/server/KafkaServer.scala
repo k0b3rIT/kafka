@@ -17,6 +17,8 @@
 
 package kafka.server
 
+import com.cloudera.kafka.metrics.HttpMetricsReporterExclude
+
 import kafka.cluster.{Broker, EndPoint}
 import kafka.common.GenerateBrokerIdException
 import kafka.controller.KafkaController
@@ -24,7 +26,7 @@ import kafka.coordinator.group.GroupCoordinatorAdapter
 import kafka.coordinator.transaction.{ProducerIdManager, TransactionCoordinator}
 import kafka.log.LogManager
 import kafka.log.remote.RemoteLogManager
-import kafka.metrics.KafkaMetricsReporter
+import kafka.metrics.{KafkaMetricsReporter, KafkaServerMetricsReporter}
 import kafka.network.{ControlPlaneAcceptor, DataPlaneAcceptor, RequestChannel, SocketServer}
 import kafka.raft.KafkaRaftManager
 import kafka.server.metadata.{OffsetTrackingListener, ZkConfigRepository, ZkMetadataCache}
@@ -126,6 +128,9 @@ class KafkaServer(
 
   private val kafkaMetricsReporters: Seq[KafkaMetricsReporter] =
     KafkaMetricsReporter.startReporters(VerifiableProperties(config.originals))
+  kafkaMetricsReporters.filter(_.isInstanceOf[KafkaServerMetricsReporter]).foreach(_.asInstanceOf[KafkaServerMetricsReporter].setupAndStart(Some(this)))
+
+  var topicReplicaMetricsFilter: HttpMetricsReporterExclude = null
   var kafkaYammerMetrics: KafkaYammerMetrics = _
   var metrics: Metrics = _
 
@@ -272,6 +277,8 @@ class KafkaServer(
         kafkaScheduler.startup()
 
         /* create and configure metrics */
+        topicReplicaMetricsFilter = HttpMetricsReporterExclude.INSTANCE
+        topicReplicaMetricsFilter.configure(config.originals)
         kafkaYammerMetrics = KafkaYammerMetrics.INSTANCE
         kafkaYammerMetrics.configure(config.originals)
         metrics = Server.initializeMetrics(config, time, clusterId)

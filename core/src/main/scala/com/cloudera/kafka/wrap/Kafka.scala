@@ -29,12 +29,14 @@ import scala.sys.process.Process
 
 object Kafka extends Logging {
 
-  val SslPasswordParams: Array[String] = Array(
+  val BasicAuthPassword = "kafka.http.metrics.password"
+  val PasswordParams: Array[String] = Array(
     SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG,
     SslConfigs.SSL_KEY_PASSWORD_CONFIG,
     SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG,
     ZkConfigs.ZK_SSL_KEY_STORE_PASSWORD_CONFIG,
-    ZkConfigs.ZK_SSL_TRUST_STORE_PASSWORD_CONFIG)
+    ZkConfigs.ZK_SSL_TRUST_STORE_PASSWORD_CONFIG,
+    BasicAuthPassword)
 
   def exec(command: String): String = {
     // removing extra newline character from the end (Process execution puts it there)
@@ -42,7 +44,7 @@ object Kafka extends Logging {
   }
 
   def generatePasswordsOverrides(serverProps: Properties): Array[String] = {
-    val generatedProps: Properties = generateSslPasswords(serverProps)
+    val generatedProps: Properties = generatePasswords(serverProps)
     generatedProps.asInstanceOf[util.Hashtable[Object, Object]].putAll(generateDelegationTokenPassword(serverProps))
     val props = generatedProps.asScala
 
@@ -75,9 +77,9 @@ object Kafka extends Logging {
     generatedProps
   }
 
-  def generateSslPasswords(props: Properties): Properties = {
+  def generatePasswords(props: Properties): Properties = {
     val generatedProps: Properties = new Properties()
-    SslPasswordParams.foreach(key => generatePasswordForKey(key, props, generatedProps))
+    PasswordParams.foreach(key => generatePasswordForKey(key, props, generatedProps))
     generatedProps
   }
 

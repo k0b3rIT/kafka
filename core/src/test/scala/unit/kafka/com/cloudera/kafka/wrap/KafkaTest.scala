@@ -67,7 +67,6 @@ class KafkaTest {
     val originalProps = new Properties
     originalProps.put("delegation.token.enable", "false")
     originalProps.put(generatorKeyFor(DelegationTokenManagerConfigs.DELEGATION_TOKEN_SECRET_KEY_CONFIG), "echo M4573RK3Y")
-
     val generated = Kafka.generateDelegationTokenPassword(originalProps)
 
     assertFalse(originalProps.containsKey("delegation.token.enable"))
@@ -108,7 +107,7 @@ class KafkaTest {
     originalProps.put(generatorKeyFor(SslConfigs.SSL_KEY_PASSWORD_CONFIG), "echo p2")
     originalProps.put(generatorKeyFor(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG), "echo p3")
 
-    val generated = Kafka.generateSslPasswords(originalProps)
+    val generated = Kafka.generatePasswords(originalProps)
 
     assertEquals("p1", generated.getProperty(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG).trim)
     assertFalse(originalProps.contains(generatorKeyFor(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG)))
@@ -126,7 +125,7 @@ class KafkaTest {
     originalProps.put(generatorKeyFor(SslConfigs.SSL_KEY_PASSWORD_CONFIG), "echo p3")
     originalProps.put(generatorKeyFor(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG), "echo p2")
 
-    val generated = Kafka.generateSslPasswords(originalProps)
+    val generated = Kafka.generatePasswords(originalProps)
 
     assertFalse(generated.contains(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG))
     assertFalse(generated.contains(SslConfigs.SSL_KEY_PASSWORD_CONFIG))

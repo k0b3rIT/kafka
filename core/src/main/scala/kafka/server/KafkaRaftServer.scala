@@ -16,10 +16,12 @@
  */
 package kafka.server
 
+import com.cloudera.kafka.metrics.HttpMetricsReporterExclude
+
 import java.io.File
 import java.util.concurrent.CompletableFuture
 import kafka.log.UnifiedLog
-import kafka.metrics.KafkaMetricsReporter
+import kafka.metrics.{KafkaMetricsReporter, KafkaServerMetricsReporter}
 import kafka.utils.{CoreUtils, Logging, Mx4jLoader, VerifiableProperties}
 import org.apache.kafka.common.config.{ConfigDef, ConfigResource}
 import org.apache.kafka.common.internals.Topic
@@ -38,6 +40,7 @@ import org.slf4j.Logger
 
 import java.util
 import java.util.{Optional, OptionalInt}
+import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 /**
@@ -53,8 +56,10 @@ class KafkaRaftServer(
 ) extends Server with Logging {
 
   this.logIdent = s"[KafkaRaftServer nodeId=${config.nodeId}] "
-  KafkaMetricsReporter.startReporters(VerifiableProperties(config.originals))
+  private val kafkaMetricsReporters: mutable.Seq[KafkaMetricsReporter] =
+    KafkaMetricsReporter.startReporters(VerifiableProperties(config.originals))
   KafkaYammerMetrics.INSTANCE.configure(config.originals)
+  HttpMetricsReporterExclude.INSTANCE.configure(config.originals)
 
   private val (metaPropsEnsemble, bootstrapMetadata) =
     KafkaRaftServer.initializeLogDirs(config, this.logger.underlying, this.logIdent)
@@ -80,6 +85,9 @@ class KafkaRaftServer(
   } else {
     None
   }
+  if (broker.isDefined) {
+    kafkaMetricsReporters.filter(_.isInstanceOf[KafkaServerMetricsReporter]).foreach(_.asInstanceOf[KafkaServerMetricsReporter].setupAndStart(broker))
+  }
 
   private val controller: Option[ControllerServer] = if (config.processRoles.contains(ProcessRole.ControllerRole)) {
     Some(new ControllerServer(
@@ -89,6 +97,9 @@ class KafkaRaftServer(
     ))
   } else {
     None
+  }
+  if (controller.isDefined) {
+    kafkaMetricsReporters.filter(_.isInstanceOf[KafkaServerMetricsReporter]).foreach(_.asInstanceOf[KafkaServerMetricsReporter].setupAndStart(None))
   }
 
   override def startup(): Unit = {

@@ -19,7 +19,20 @@ import org.gradle.api.JavaVersion
 import java.nio.charset.StandardCharsets
 
 buildscript {
+  ext {
+    mavenUrl = project.hasProperty('mavenUrl') ? project.mavenUrl : ''
+    gbnUrl = project.hasProperty('gbnUrl') ? project.gbnUrl : ''
+  }
+
   repositories {
+    maven {
+      url gbnUrl
+      allowInsecureProtocol = true
+    }
+    maven {
+      url mavenUrl
+      allowInsecureProtocol = true
+    }
     mavenCentral()
   }
   apply from: "$rootDir/gradle/dependencies.gradle"
@@ -38,6 +51,7 @@ plugins {
   id 'org.owasp.dependencycheck' version '8.2.1'
   id 'org.nosphere.apache.rat' version "0.8.1"
   id "io.swagger.core.v3.swagger-gradle-plugin" version "${swaggerVersion}"
+  id 'org.sonarqube' version '3.3'
 
   // When updating the spotbugs gradle plugin, check if it already
   // includes spotbugs version 4.7.4, in which case CVE-2022-42920 can
@@ -51,6 +65,27 @@ plugins {
   //  We are going to drop JDK8 support. Hence, the spotless is upgrade to newest version and be applied only if the build env is compatible with JDK 11.
   //  spotless 6.15.0+ has issue in runtime with JDK8 even through we define it with `apply:false`. see https://github.com/diffplug/spotless/issues/2156 for more details
   id 'com.diffplug.spotless' version "6.14.0" apply false
+}
+
+dependencyCheck {
+  formats = ['HTML', 'JSON']
+  cve {
+    urlModified = 'http://kafka-toolshed.infra.cloudera.com/nvd/nvdcve-1.1-modified.json.gz'
+    urlBase = 'http://kafka-toolshed.infra.cloudera.com/nvd/nvdcve-1.1-%d.json.gz'
+    waitTime = 4000
+    startYear = 2002
+  }
+  analyzers {
+    nuspecEnabled = false
+    assemblyEnabled = false
+    msbuildEnabled = false
+    retirejs {
+      enabled = false
+    }
+    ossIndex {
+      enabled = false
+    }
+  }
 }
 
 ext {
@@ -129,6 +164,14 @@ ext {
 allprojects {
 
   repositories {
+    maven {
+      url gbnUrl
+      allowInsecureProtocol = true
+    }
+    maven {
+      url mavenUrl
+      allowInsecureProtocol = true
+    }
     mavenCentral()
   }
 
@@ -226,6 +269,8 @@ if (repo != null) {
         '**/.git/**',
         '**/.idea/**',
         '**/build/**',
+        'ci/**',
+        'cloudera/**',
         'CONTRIBUTING.md',
         'PULL_REQUEST_TEMPLATE.md',
         'gradlew',
@@ -371,7 +416,7 @@ subprojects {
             artifactId = base.archivesName.get()
             pom {
               name = 'Apache Kafka'
-              url = 'https://kafka.apache.org'
+              url = 'http://kafka.apache.org'
               licenses {
                 license {
                   name = 'The Apache License, Version 2.0'
@@ -971,6 +1016,13 @@ project(':core') {
 
     compileOnly libs.reload4j
 
+    runtimeOnly libs.slf4jReload4j
+    runtimeOnly libs.reload4j
+    runtimeOnly (libs.logredactor) {
+      exclude group: 'org.apache.logging.log4j'
+      exclude group: 'log4j', module: 'log4j'
+    }
+
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':group-coordinator').sourceSets.test.output
     testImplementation project(':metadata').sourceSets.test.output
@@ -1230,6 +1282,12 @@ project(':core') {
       scala {
         srcDirs = ["src/test/java", "src/test/scala"]
       }
+    }
+  }
+
+  sonarqube {
+    properties {
+      property "sonar.scala.coverage.reportPaths", "build/reports/scoverageUnitTest/scoverage.xml, build/reports/scoverageIntegrationTest/scoverage.xml"
     }
   }
 }
@@ -2574,6 +2632,7 @@ project(':streams:examples') {
     implementation project(':streams')
 
     implementation libs.slf4jReload4j
+    implementation libs.reload4j
 
     testImplementation project(':streams:test-utils')
     testImplementation project(':clients').sourceSets.test.output // for org.apache.kafka.test.IntegrationTest
@@ -3047,6 +3106,7 @@ project(':log4j-appender') {
   dependencies {
     implementation project(':clients')
     implementation libs.slf4jReload4j
+    implementation libs.reload4j
 
     testImplementation project(':clients').sourceSets.test.output
     testImplementation libs.junitJupiter
@@ -3109,6 +3169,7 @@ project(':plugins') {
     implementation project(':clients')
     implementation libs.shiro
     implementation libs.libpam4j
+    implementation libs.jna
     implementation libs.slf4jApi
 
     testImplementation libs.junitJupiter

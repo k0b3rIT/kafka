@@ -127,7 +127,7 @@ public class ConnectRestServerTest {
         doReturn(plugins).when(herder).plugins();
         doReturn(Collections.emptyList()).when(plugins).newPlugins(eq(Collections.emptyList()), any(), eq(ConnectRestExtension.class));
 
-        server = new ConnectRestServer(null, null, configMap);
+        server = new ConnectRestServer(null, restClient, configMap);
         server.initializeServer();
         server.initializeResources(herder);
 
@@ -151,7 +151,7 @@ public class ConnectRestServerTest {
         doReturn(plugins).when(herder).plugins();
         doReturn(Collections.emptyList()).when(plugins).newPlugins(eq(Collections.emptyList()), any(), eq(ConnectRestExtension.class));
 
-        server = new ConnectRestServer(null, null, configMap);
+        server = new ConnectRestServer(null, restClient, configMap);
         server.initializeServer();
         server.initializeResources(herder);
 

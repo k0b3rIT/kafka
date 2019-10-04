@@ -31,6 +31,8 @@
   <allow pkg="org.hamcrest" />
   <allow pkg="org.mockito" />
   <allow pkg="java.security" />
+  <allow class="javax.net.SocketFactory" />
+  <allow class="org.apache.commons.lang.SystemUtils"/>
   <allow pkg="javax.net.ssl" />
   <allow pkg="javax.security" />
   <allow pkg="org.ietf.jgss" />
@@ -122,6 +124,19 @@
       <allow pkg="org.apache.kafka.common.errors" />
       <!-- To access DefaultPrincipalData -->
       <allow pkg="org.apache.kafka.common.message" />
+      <subpackage name="ldap">
+        <subpackage name="internals">
+          <allow pkg="org.apache.shiro" />
+          <!-- for testing -->
+          <allow pkg= "org.apache.directory.server" />
+          <allow pkg= "org.apache.directory.api" />
+        </subpackage>
+      </subpackage>
+      <subpackage name="pam">
+        <subpackage name="internals">
+          <allow pkg="org.jvnet.libpam" />
+        </subpackage>
+      </subpackage>
       <subpackage name="authenticator">
         <allow pkg="org.apache.kafka.common.message" />
         <allow pkg="org.apache.kafka.common.protocol.types" />

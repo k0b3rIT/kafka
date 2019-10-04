@@ -1178,6 +1178,8 @@ project(':core') {
     from(project(':tools:tools-api').configurations.runtimeClasspath) { into("libs/") }
     from(project(':metrics-reporter').jar) { into("libs/") }
     from(project(':metrics-reporter').configurations.runtimeClasspath) { into("libs/") }
+    from(project(':plugins').jar) { into("libs/") }
+    from(project(':plugins').configurations.runtimeClasspath) { into("libs/") }
     duplicatesStrategy 'exclude'
   }
 
@@ -3093,6 +3095,25 @@ project(':metrics-reporter') {
     testImplementation project(':clients').sourceSets.test.output
     testImplementation libs.junitJupiter
     testImplementation libs.mockitoCore
+  }
+
+  javadoc {
+    enabled = false
+  }
+}
+
+project(':plugins') {
+  archivesBaseName = "kafka-cloudera-plugins"
+
+  dependencies {
+    implementation project(':clients')
+    implementation libs.shiro
+    implementation libs.libpam4j
+    implementation libs.slf4jApi
+
+    testImplementation libs.junitJupiter
+    testImplementation libs.apachedsTestFramework
+    testImplementation project(':clients').sourceSets.test.output
   }
 
   javadoc {

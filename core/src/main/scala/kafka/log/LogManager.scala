@@ -160,6 +160,14 @@ class LogManager(logDirs: Seq[File],
     metricsGroup.newGauge("LogDirectoryOffline",
       () => if (_liveLogDirs.contains(dir)) 0 else 1,
       Map("logDirectory" -> dir.getAbsolutePath).asJava)
+
+    metricsGroup.newGauge("LogDirectoryDiskTotalSpace",
+      () => dir.getTotalSpace,
+      Map("logDirectory" -> dir.getAbsolutePath).asJava)
+
+    metricsGroup.newGauge("LogDirectoryDiskFreeSpace",
+      () => dir.getFreeSpace,
+      Map("logDirectory" -> dir.getAbsolutePath).asJava)
   }
 
   /**
@@ -661,6 +669,8 @@ class LogManager(logDirs: Seq[File],
     metricsGroup.removeMetric("OfflineLogDirectoryCount")
     for (dir <- logDirs) {
       metricsGroup.removeMetric("LogDirectoryOffline", Map("logDirectory" -> dir.getAbsolutePath).asJava)
+      metricsGroup.removeMetric("LogDirectoryDiskTotalSpace", Map("logDirectory" -> dir.getAbsolutePath).asJava)
+      metricsGroup.removeMetric("LogDirectoryDiskFreeSpace", Map("logDirectory" -> dir.getAbsolutePath).asJava)
     }
 
     val threadPools = ArrayBuffer.empty[ExecutorService]

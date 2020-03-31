@@ -269,7 +269,6 @@ if (repo != null) {
         '**/.git/**',
         '**/.idea/**',
         '**/build/**',
-        'ci/**',
         'cloudera/**',
         'CONTRIBUTING.md',
         'PULL_REQUEST_TEMPLATE.md',

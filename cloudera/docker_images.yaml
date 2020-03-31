@@ -1,0 +1,5 @@
+docker_images:
+  kafka: __REGISTRY__/kafka:__VERSION__
+  kafka-latest: __REGISTRY__/kafka:__STACK_LATEST__
+  kafka-connect: __REGISTRY__/kafka-connect-base:__VERSION__
+  kafka-connect-latest: __REGISTRY__/kafka-connect-base:__STACK_LATEST__

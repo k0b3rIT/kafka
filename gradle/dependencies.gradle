@@ -80,6 +80,7 @@ else
 // See https://issues.apache.org/jira/browse/KAFKA-12622 for steps to verify the LICENSE-binary file is correct.
 versions += [
   activation: "1.1.1",
+  apacheCommonsLang3: "3.12.0",
   apacheda: "1.0.2",
   apacheds: "2.0.0-M24",
   argparse4j: "0.7.0",
@@ -116,6 +117,7 @@ versions += [
   jopt: "5.0.4",
   jose4j: "0.9.6",
   junit: "5.10.2",
+  junitPlatformLauncher: "1.9.2",
   jqwik: "1.8.3",
   kafka_0100: "0.10.0.1",
   kafka_0101: "0.10.1.1",
@@ -164,6 +166,7 @@ versions += [
   slf4j: "1.7.36",
   snappy: project.hasProperty('snappyVersion') ? project.snappyVersion : "1.1.10.5",
   spotbugs: "4.8.0",
+  testContainers: "1.17.2",
   zinc: "1.9.2",
   zookeeper: project.hasProperty('zookeeperVersion') ? project.zookeeperVersion : "3.8.4",
   // When updating the zstd version, please do as well in docker/native/native-image-configs/resource-config.json
@@ -174,6 +177,7 @@ versions += [
 
 libs += [
   activation: "javax.activation:activation:$versions.activation",
+  apacheCommonsLang3: "org.apache.commons:commons-lang3:$versions.apacheCommonsLang3",
   apacheda: "org.apache.directory.api:api-all:$versions.apacheda",
   apachedsCoreApi: "org.apache.directory.server:apacheds-core-api:$versions.apacheds",
   apachedsInterceptorKerberos: "org.apache.directory.server:apacheds-interceptor-kerberos:$versions.apacheds",
@@ -193,6 +197,7 @@ libs += [
   jacksonAnnotations: "com.fasterxml.jackson.core:jackson-annotations:$versions.jackson",
   jacksonDatabind: "com.fasterxml.jackson.core:jackson-databind:$versions.jackson",
   jacksonDataformatCsv: "com.fasterxml.jackson.dataformat:jackson-dataformat-csv:$versions.jackson",
+  jacksonDataformatYaml: "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$versions.jackson",
   jacksonModuleScala: "com.fasterxml.jackson.module:jackson-module-scala_$versions.baseScala:$versions.jackson",
   jacksonJDK8Datatypes: "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$versions.jackson",
   jacksonAfterburner: "com.fasterxml.jackson.module:jackson-module-afterburner:$versions.jackson",
@@ -218,6 +223,7 @@ libs += [
   junitJupiterApi: "org.junit.jupiter:junit-jupiter-api:$versions.junit",
   junitPlatformSuiteEngine: "org.junit.platform:junit-platform-suite-engine:$versions.junitPlatform",
   junitPlatformLanucher: "org.junit.platform:junit-platform-launcher:$versions.junitPlatform",
+  junitVintageEngine: "org.junit.vintage:junit-vintage-engine:$versions.junit",
   jqwik: "net.jqwik:jqwik:$versions.jqwik",
   hamcrest: "org.hamcrest:hamcrest:$versions.hamcrest",
   kafkaStreams_0100: "org.apache.kafka:kafka-streams:$versions.kafka_0100",
@@ -276,9 +282,11 @@ libs += [
   snappy: "org.xerial.snappy:snappy-java:$versions.snappy",
   swaggerAnnotations: "io.swagger.core.v3:swagger-annotations:$swaggerVersion",
   swaggerJaxrs2: "io.swagger.core.v3:swagger-jaxrs2:$swaggerVersion",
+  testContainers: "org.testcontainers:testcontainers:$versions.testContainers",
   zookeeper: "org.apache.zookeeper:zookeeper:$versions.zookeeper",
   jfreechart: "jfreechart:jfreechart:$versions.jfreechart",
   mavenArtifact: "org.apache.maven:maven-artifact:$versions.mavenArtifact",
   zstd: "com.github.luben:zstd-jni:$versions.zstd",
   httpclient: "org.apache.httpcomponents:httpclient:$versions.httpclient"
+
 ]

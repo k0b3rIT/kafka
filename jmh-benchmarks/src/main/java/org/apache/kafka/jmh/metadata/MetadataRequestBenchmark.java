@@ -208,6 +208,7 @@ public class MetadataRequestBenchmark {
                     false,
                     false,
                     () -> FinalizedFeatures.fromKRaftVersion(MetadataVersion.latestTesting()))).
+            setAuditors(Collections.emptyList()).
             build();
     }
 

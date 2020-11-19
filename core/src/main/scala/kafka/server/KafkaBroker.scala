@@ -32,6 +32,7 @@ import org.apache.kafka.coordinator.group.GroupCoordinator
 import org.apache.kafka.metadata.BrokerState
 import org.apache.kafka.security.CredentialProvider
 import org.apache.kafka.server.NodeToControllerChannelManager
+import org.apache.kafka.server.auditor.Auditor
 import org.apache.kafka.server.authorizer.Authorizer
 import org.apache.kafka.server.metrics.{KafkaMetricsGroup, KafkaYammerMetrics, LinuxIoMetricsCollector}
 import org.apache.kafka.server.util.Scheduler
@@ -77,6 +78,7 @@ trait KafkaBroker extends Logging {
   val NumFetchSessionCacheShards: Int = 8
 
   def authorizer: Option[Authorizer]
+  def auditors: List[Auditor]
   def brokerState: BrokerState
   def clusterId: String
   def config: KafkaConfig

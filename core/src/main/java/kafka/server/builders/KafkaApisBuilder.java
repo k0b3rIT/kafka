@@ -36,11 +36,14 @@ import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.coordinator.group.GroupCoordinator;
 import org.apache.kafka.server.ClientMetricsManager;
+import org.apache.kafka.server.auditor.Auditor;
 import org.apache.kafka.server.authorizer.Authorizer;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
+import scala.collection.JavaConverters;
 import scala.compat.java8.OptionConverters;
 
 
@@ -65,6 +68,7 @@ public class KafkaApisBuilder {
     private DelegationTokenManager tokenManager = null;
     private ApiVersionManager apiVersionManager = null;
     private Optional<ClientMetricsManager> clientMetricsManager = Optional.empty();
+    private List<Auditor> auditors;
 
     public KafkaApisBuilder setRequestChannel(RequestChannel requestChannel) {
         this.requestChannel = requestChannel;
@@ -166,6 +170,11 @@ public class KafkaApisBuilder {
         return this;
     }
 
+    public KafkaApisBuilder setAuditors(List<Auditor> auditors) {
+        this.auditors = auditors;
+        return this;
+    }
+
     public KafkaApis build() {
         if (requestChannel == null) throw new RuntimeException("you must set requestChannel");
         if (metadataSupport == null) throw new RuntimeException("you must set metadataSupport");
@@ -182,6 +191,7 @@ public class KafkaApisBuilder {
         if (fetchManager == null) throw new RuntimeException("You must set fetchManager");
         if (brokerTopicStats == null) brokerTopicStats = new BrokerTopicStats(config.remoteLogManagerConfig().isRemoteStorageSystemEnabled());
         if (apiVersionManager == null) throw new RuntimeException("You must set apiVersionManager");
+        if (auditors == null) throw new RuntimeException("You must set auditors");
 
         return new KafkaApis(requestChannel,
                              metadataSupport,
@@ -202,6 +212,7 @@ public class KafkaApisBuilder {
                              time,
                              tokenManager,
                              apiVersionManager,
-                             OptionConverters.toScala(clientMetricsManager));
+                             OptionConverters.toScala(clientMetricsManager),
+                             JavaConverters.asScalaIteratorConverter(auditors.iterator()).asScala().toList());
     }
 }

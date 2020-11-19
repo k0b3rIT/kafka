@@ -21,6 +21,7 @@ import kafka.api.ElectLeadersRequestOps
 import kafka.controller.ReplicaAssignment
 import kafka.coordinator.transaction.{InitProducerIdResult, TransactionCoordinator}
 import kafka.network.RequestChannel
+import kafka.security.audit.AuditorHelper
 import kafka.server.QuotaFactory.{QuotaManagers, UnboundedQuota}
 import kafka.server.handlers.DescribeTopicPartitionsRequestHandler
 import kafka.server.metadata.{ConfigRepository, KRaftMetadataCache}
@@ -33,7 +34,7 @@ import org.apache.kafka.common.acl.AclOperation
 import org.apache.kafka.common.acl.AclOperation._
 import org.apache.kafka.common.config.ConfigResource
 import org.apache.kafka.common.errors._
-import org.apache.kafka.common.internals.Topic.{GROUP_METADATA_TOPIC_NAME, TRANSACTION_STATE_TOPIC_NAME, isInternal}
+import org.apache.kafka.common.internals.Topic.{isInternal, GROUP_METADATA_TOPIC_NAME, TRANSACTION_STATE_TOPIC_NAME}
 import org.apache.kafka.common.internals.{FatalExitError, Topic}
 import org.apache.kafka.common.message.AddPartitionsToTxnResponseData.{AddPartitionsToTxnResult, AddPartitionsToTxnResultCollection}
 import org.apache.kafka.common.message.AlterConfigsResponseData.AlterConfigsResourceResponse
@@ -62,13 +63,16 @@ import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse
 import org.apache.kafka.common.requests._
 import org.apache.kafka.common.resource.Resource.CLUSTER_NAME
 import org.apache.kafka.common.resource.ResourceType._
-import org.apache.kafka.common.resource.{Resource, ResourceType}
+import org.apache.kafka.common.resource.{PatternType, Resource, ResourcePattern, ResourceType}
 import org.apache.kafka.common.security.auth.{KafkaPrincipal, SecurityProtocol}
 import org.apache.kafka.common.security.token.delegation.{DelegationToken, TokenInformation}
 import org.apache.kafka.common.utils.{ProducerIdAndEpoch, Time}
 import org.apache.kafka.common.{Node, TopicIdPartition, TopicPartition, Uuid}
 import org.apache.kafka.coordinator.group.{Group, GroupCoordinator}
 import org.apache.kafka.server.ClientMetricsManager
+import org.apache.kafka.server.auditor.{Auditor, FetchEvent, ProduceEvent, SyncGroupEvent, TopicEvent}
+import org.apache.kafka.server.auditor.Auditor.AuditInformation
+import org.apache.kafka.server.auditor.TopicEvent.AuditedTopic
 import org.apache.kafka.server.authorizer._
 import org.apache.kafka.server.common.{MetadataVersion}
 import org.apache.kafka.server.common.MetadataVersion.{IBP_0_11_0_IV0, IBP_2_3_IV0}
@@ -110,8 +114,8 @@ class KafkaApis(val requestChannel: RequestChannel,
                 time: Time,
                 val tokenManager: DelegationTokenManager,
                 val apiVersionManager: ApiVersionManager,
-                val clientMetricsManager: Option[ClientMetricsManager]
-) extends ApiRequestHandler with Logging {
+                val clientMetricsManager: Option[ClientMetricsManager],
+                val auditors: List[Auditor]) extends AuditorHelper(auditors) with ApiRequestHandler with Logging {
 
   type FetchResponseStats = Map[TopicPartition, RecordValidationStats]
   this.logIdent = "[KafkaApi-%d] ".format(brokerId)
@@ -653,6 +657,12 @@ class KafkaApis(val requestChannel: RequestChannel,
       var errorInResponse = false
 
       val nodeEndpoints = new mutable.HashMap[Int, Node]
+      val produceEvent = new ProduceEvent(mergedResponseStatus.map { case (tp, _) => tp.topic() }.toSet.asJava, request.context.clientId())
+      val auditInfo = mergedResponseStatus.map{ case (tp, pr) =>
+        new AuditInformation(new ResourcePattern(TOPIC, tp.topic, PatternType.LITERAL), pr.error.code())
+      }.toSeq
+      audit(produceEvent, request.context, Map(WRITE -> auditInfo))
+
       mergedResponseStatus.forKeyValue { (topicPartition, status) =>
         if (status.error != Errors.NONE) {
           errorInResponse = true
@@ -1026,6 +1036,12 @@ class KafkaApis(val requestChannel: RequestChannel,
           unconvertedFetchResponse
         }
 
+        val fetchEvent = new FetchEvent(fetchData.asScala.map(e => e._1.topic).toSet.asJava, request.context.clientId)
+        val auditInfo = responsePartitionData.map { case (topic, partitionData) =>
+          new AuditInformation(new ResourcePattern(TOPIC, topic.topic, PatternType.LITERAL), partitionData.error.code)
+        }
+        audit(fetchEvent, request.context, Map(READ -> auditInfo))
+
         // Send the response immediately.
         requestChannel.sendResponse(request, createResponse(maxThrottleTimeMs, unconvertedFetchResponse), Some(updateConversionStats))
       }
@@ -1290,7 +1306,9 @@ class KafkaApis(val requestChannel: RequestChannel,
       val nonExistingTopics = topics.diff(topicResponses.map(_.name).toSet)
       val nonExistingTopicResponses = if (allowAutoTopicCreation) {
         val controllerMutationQuota = quotas.controllerMutation.newPermissiveQuotaFor(request)
-        autoTopicCreationManager.createTopics(nonExistingTopics, controllerMutationQuota, Some(request.context))
+        val topicsResult = autoTopicCreationManager.createTopics(nonExistingTopics, controllerMutationQuota, Some(request.context))
+        auditTopicMetadata(topicsResult, request.context)
+        topicsResult
       } else {
         nonExistingTopics.map { topic =>
           val error = try {
@@ -1312,6 +1330,19 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
 
       topicResponses ++ nonExistingTopicResponses
+    }
+  }
+
+  private def auditTopicMetadata(topicMetadata: Seq[MetadataResponseData.MetadataResponseTopic], ctx: RequestContext): Unit = {
+    topicMetadata.foreach { tm =>
+      val unknownPartitionOrReplicaSize = -1
+      val numPartitions = if (tm.partitions.size > 0) tm.partitions.size else unknownPartitionOrReplicaSize
+      val replicaSize = if (tm.partitions.size > 0) tm.partitions.get(0).replicaNodes.size else unknownPartitionOrReplicaSize
+      val topicEvent = new TopicEvent(Collections.singleton(
+        new AuditedTopic(tm.name, numPartitions, replicaSize)), TopicEvent.EventType.CREATE)
+      audit(topicEvent, ctx, Map(AclOperation.CREATE ->
+        Seq(new AuditInformation(
+          new ResourcePattern(ResourceType.TOPIC, tm.name, PatternType.LITERAL), tm.errorCode))))
     }
   }
 
@@ -1724,7 +1755,8 @@ class KafkaApis(val requestChannel: RequestChannel,
 
       if (topicMetadata.headOption.isEmpty) {
         val controllerMutationQuota = quotas.controllerMutation.newPermissiveQuotaFor(request)
-        autoTopicCreationManager.createTopics(Seq(internalTopicName).toSet, controllerMutationQuota, None)
+        val topicsResult = autoTopicCreationManager.createTopics(Seq(internalTopicName).toSet, controllerMutationQuota, None)
+        auditTopicMetadata(topicsResult, request.context)
         (Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode)
       } else {
         if (topicMetadata.head.errorCode != Errors.NONE.code) {
@@ -1876,6 +1908,11 @@ class KafkaApis(val requestChannel: RequestChannel,
         syncGroupRequest.data,
         requestLocal.bufferSupplier
       ).handle[Unit] { (response, exception) =>
+        if (syncGroupRequest.data != null) {
+          val syncGroupEvent = new SyncGroupEvent(request.context.clientId, syncGroupRequest.data.groupId)
+          val error = if (exception == null) Errors.NONE else Errors.forException(exception)
+          audit(syncGroupEvent, request.context, READ, GROUP, syncGroupRequest.data.groupId, error)
+        }
         if (exception != null) {
           requestHelper.sendMaybeThrottle(request, syncGroupRequest.getErrorResponse(exception))
         } else {
@@ -2013,6 +2050,14 @@ class KafkaApis(val requestChannel: RequestChannel,
         s"${request.header.correlationId} to client ${request.header.clientId}.")
       requestHelper.sendResponseMaybeThrottleWithControllerQuota(controllerMutationQuota, request, response)
     }
+    def auditTopicCreate(topicsResult: CreatableTopicResultCollection): Unit = {
+      val topicEvent = new TopicEvent(topicsResult.asScala.map(topic =>
+        new AuditedTopic(topic.name, topic.numPartitions, topic.replicationFactor)).toSet.asJava, TopicEvent.EventType.CREATE)
+      val authInfoList = topicsResult.asScala.map(topic => {
+        new AuditInformation(new ResourcePattern(ResourceType.TOPIC, topic.name, PatternType.LITERAL), topic.errorCode)
+      }).toSeq
+      audit(topicEvent, request.context, Map(AclOperation.CREATE -> authInfoList))
+    }
 
     val createTopicsRequest = request.body[CreateTopicsRequest]
     val results = new CreatableTopicResultCollection(createTopicsRequest.data.topics.size)
@@ -2021,6 +2066,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         results.add(new CreatableTopicResult().setName(topic.name)
           .setErrorCode(Errors.NOT_CONTROLLER.code))
       }
+      auditTopicCreate(results)
       sendResponseCallback(results)
     } else {
       createTopicsRequest.data.topics.forEach { topic =>
@@ -2087,6 +2133,7 @@ class KafkaApis(val requestChannel: RequestChannel,
               .setTopicConfigErrorCode(Errors.NONE.code)
           }
         }
+        auditTopicCreate(results)
         sendResponseCallback(results)
       }
       zkSupport.adminManager.createTopics(
@@ -2118,6 +2165,15 @@ class KafkaApis(val requestChannel: RequestChannel,
       requestHelper.sendResponseMaybeThrottleWithControllerQuota(controllerMutationQuota, request, response)
     }
 
+    def auditPartitionCreate(results: Map[String, ApiError]): Unit = {
+      val event = new TopicEvent(createPartitionsRequest.data().topics().asScala
+        .map(t => AuditedTopic.withPartitionNumber(t.name, t.count)).toSet.asJava, TopicEvent.EventType.PARTITION_CHANGE)
+      val authInfoList = results.map{ case(topic, error) =>
+        new AuditInformation(new ResourcePattern(ResourceType.TOPIC, topic, PatternType.LITERAL), error.error.code)
+      }.toSeq
+      audit(event, request.context, Map(AclOperation.ALTER -> authInfoList))
+    }
+
     if (!zkSupport.controller.isActive) {
       val result = createPartitionsRequest.data.topics.asScala.map { topic =>
         (topic.name, new ApiError(Errors.NOT_CONTROLLER, null))
@@ -2146,7 +2202,10 @@ class KafkaApis(val requestChannel: RequestChannel,
         valid,
         createPartitionsRequest.data.validateOnly,
         controllerMutationQuota,
-        result => sendResponseCallback(result ++ errors))
+        result => {
+          auditPartitionCreate(result ++ errors)
+          sendResponseCallback(result ++ errors)
+        })
     }
   }
 
@@ -2161,6 +2220,17 @@ class KafkaApis(val requestChannel: RequestChannel,
       trace(s"Sending delete topics response $response for correlation id ${request.header.correlationId} to client ${request.header.clientId}.")
       requestHelper.sendResponseMaybeThrottleWithControllerQuota(controllerMutationQuota, request, response)
     }
+    def auditTopicDelete(topicsResult: DeletableTopicResultCollection): Unit = {
+      val topicDeleteEvent = new TopicEvent(topicsResult.asScala.map(topic => new AuditedTopic(topic.name)).toSet.asJava, TopicEvent.EventType.DELETE)
+      val authInfoList = topicsResult.asScala.map(topic => {
+        if (topic.name == null) {
+          new AuditInformation(new ResourcePattern(ResourceType.TOPIC, "UNKNOWN", PatternType.LITERAL), topic.errorCode)
+        } else {
+          new AuditInformation(new ResourcePattern(ResourceType.TOPIC, topic.name, PatternType.LITERAL), topic.errorCode)
+        }
+      }).toSeq
+      audit(topicDeleteEvent, request.context, Map(AclOperation.DELETE -> authInfoList))
+    }
 
     val deleteTopicRequest = request.body[DeleteTopicsRequest]
     val results = new DeletableTopicResultCollection(deleteTopicRequest.numberOfTopics())
@@ -2172,6 +2242,7 @@ class KafkaApis(val requestChannel: RequestChannel,
           .setTopicId(topic.topicId())
           .setErrorCode(Errors.NOT_CONTROLLER.code))
       }
+      auditTopicDelete(results)
       sendResponseCallback(results)
     } else if (!config.deleteTopicEnable) {
       val error = if (request.context.apiVersion < 3) Errors.INVALID_REQUEST else Errors.TOPIC_DELETION_DISABLED
@@ -2181,6 +2252,7 @@ class KafkaApis(val requestChannel: RequestChannel,
           .setTopicId(topic.topicId())
           .setErrorCode(error.code))
       }
+      auditTopicDelete(results)
       sendResponseCallback(results)
     } else {
       val topicIdsFromRequest = deleteTopicRequest.topicIds().asScala.filter(topicId => topicId != Uuid.ZERO_UUID).toSet
@@ -2218,15 +2290,17 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
       }
       // If no authorized topics return immediately
-      if (toDelete.isEmpty)
+      if (toDelete.isEmpty) {
+        auditTopicDelete(results)
         sendResponseCallback(results)
-      else {
+      } else {
         def handleDeleteTopicsResults(errors: Map[String, Errors]): Unit = {
           errors.foreach {
             case (topicName, error) =>
               results.find(topicName)
                 .setErrorCode(error.code)
           }
+          auditTopicDelete(results)
           sendResponseCallback(results)
         }
 
@@ -2965,6 +3039,27 @@ class KafkaApis(val requestChannel: RequestChannel,
               }
               new ReassignableTopicResponse().setName(topic).setPartitions(partitionResponses.toList.asJava)
           }
+          val maxReplicaCountsByTopic = alterPartitionReassignmentsRequest.data.topics.asScala
+            .flatMap { t =>
+              val replicas = t.partitions.asScala.maxBy(p => if (p.replicas == null) -1 else p.replicas.size).replicas
+              if (replicas == null) None
+              else Some(t.name -> replicas.size)
+            }.toMap
+          val event = new TopicEvent(maxReplicaCountsByTopic
+            .map { case (name, count) => AuditedTopic.withReplicationFactor(name, count)}.toSet.asJava, TopicEvent.EventType.REPLICATION_FACTOR_CHANGE)
+
+          audit(event,
+            request.context,
+            Map(
+              ALTER -> topicResponses.flatMap(t =>
+                t.partitions().asScala.map(p =>
+                  new AuditInformation(
+                    new ResourcePattern(TOPIC, t.name(), PatternType.LITERAL), p.errorCode()
+                  )
+                )
+              ).toSeq
+            )
+          )
           new AlterPartitionReassignmentsResponseData().setResponses(topicResponses.toList.asJava)
       }
 

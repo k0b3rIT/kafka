@@ -40,6 +40,7 @@ import org.apache.kafka.image.publisher.{BrokerRegistrationTracker, MetadataPubl
 import org.apache.kafka.metadata.{BrokerState, ListenerInfo}
 import org.apache.kafka.security.CredentialProvider
 import org.apache.kafka.server.{AssignmentsManager, ClientMetricsManager, NodeToControllerChannelManager}
+import org.apache.kafka.server.auditor.Auditor
 import org.apache.kafka.server.authorizer.Authorizer
 import org.apache.kafka.server.common.{ApiMessageAndVersion, DirectoryEventHandler, TopicIdPartition}
 import org.apache.kafka.server.config.ConfigType
@@ -96,6 +97,7 @@ class BrokerServer(
   @volatile var dataPlaneRequestProcessor: KafkaApis = _
 
   var authorizer: Option[Authorizer] = None
+  var auditors: List[Auditor] = null
   @volatile var socketServer: SocketServer = _
   var dataPlaneRequestHandlerPool: KafkaRequestHandlerPool = _
 
@@ -380,6 +382,9 @@ class BrokerServer(
       authorizer = config.createNewAuthorizer()
       authorizer.foreach(_.configure(config.originals))
 
+      auditors = config.auditors
+      auditors.foreach(_.configure(config.originals))
+
       // The FetchSessionCache is divided into config.numIoThreads shards, each responsible
       // for Math.max(1, shardNum * sessionIdRange) <= sessionId < (shardNum + 1) * sessionIdRange
       val sessionIdRange = Int.MaxValue / NumFetchSessionCacheShards
@@ -414,7 +419,8 @@ class BrokerServer(
         time = time,
         tokenManager = tokenManager,
         apiVersionManager = apiVersionManager,
-        clientMetricsManager = Some(clientMetricsManager))
+        clientMetricsManager = Some(clientMetricsManager),
+        auditors = auditors)
 
       dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.nodeId,
         socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time,

@@ -57,6 +57,7 @@ import org.apache.kafka.raft.QuorumConfig
 import org.apache.kafka.raft.Endpoints
 import org.apache.kafka.security.CredentialProvider
 import org.apache.kafka.server.NodeToControllerChannelManager
+import org.apache.kafka.server.auditor.Auditor
 import org.apache.kafka.server.authorizer.Authorizer
 import org.apache.kafka.server.common.MetadataVersion._
 import org.apache.kafka.server.common.{ApiMessageAndVersion, MetadataVersion}
@@ -138,6 +139,7 @@ class KafkaServer(
   private var controlPlaneRequestProcessor: KafkaApis = _
 
   var authorizer: Option[Authorizer] = None
+  var auditors: List[Auditor] = null
   @volatile var socketServer: SocketServer = _
   var dataPlaneRequestHandlerPool: KafkaRequestHandlerPool = _
   private var controlPlaneRequestHandlerPool: KafkaRequestHandlerPool = _
@@ -560,6 +562,9 @@ class KafkaServer(
             }.toMap
         }
 
+        auditors = config.auditors
+        auditors.foreach(_.configure(config.originals))
+
         // The FetchSessionCache is divided into config.numIoThreads shards, each responsible
         // for Math.max(1, shardNum * sessionIdRange) <= sessionId < (shardNum + 1) * sessionIdRange
         val sessionIdRange = Int.MaxValue / NumFetchSessionCacheShards
@@ -609,7 +614,8 @@ class KafkaServer(
           time = time,
           tokenManager = tokenManager,
           apiVersionManager = apiVersionManager,
-          clientMetricsManager = None)
+          clientMetricsManager = None,
+          auditors = auditors)
 
         dataPlaneRequestProcessor = createKafkaApis(socketServer.dataPlaneRequestChannel)
 
@@ -1025,6 +1031,7 @@ class KafkaServer(
         if (controlPlaneRequestProcessor != null)
           CoreUtils.swallow(controlPlaneRequestProcessor.close(), this)
         CoreUtils.swallow(authorizer.foreach(_.close()), this)
+        CoreUtils.swallow(auditors.foreach(_.close()), this)
         if (adminManager != null)
           CoreUtils.swallow(adminManager.shutdown(), this)
 

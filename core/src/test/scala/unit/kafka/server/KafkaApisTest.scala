@@ -225,7 +225,8 @@ class KafkaApisTest extends Logging {
       time = time,
       tokenManager = null,
       apiVersionManager = apiVersionManager,
-      clientMetricsManager = clientMetricsManagerOpt)
+      clientMetricsManager = clientMetricsManagerOpt,
+      auditors = List.empty)
   }
 
   @Test
@@ -1513,7 +1514,7 @@ class KafkaApisTest extends Logging {
       offsetCommitRequest,
       RequestLocal.NoCaching.bufferSupplier
     )).thenReturn(future)
-    
+
     kafkaApis = createKafkaApis()
     kafkaApis.handle(
       requestChannelRequest,
@@ -2260,7 +2261,7 @@ class KafkaApisTest extends Logging {
     val transactionalId2 = "txnId2"
     val producerId = 15L
     val epoch = 0.toShort
-    
+
     val tp0 = new TopicPartition(topic, 0)
     val tp1 = new TopicPartition(topic, 1)
 
@@ -2313,12 +2314,12 @@ class KafkaApisTest extends Logging {
     kafkaApis.handleAddPartitionsToTxnRequest(request, requestLocal)
 
     val response = verifyNoThrottling[AddPartitionsToTxnResponse](request)
-    
+
     val expectedErrors = Map(
       transactionalId1 -> Collections.singletonMap(tp0, Errors.NONE),
       transactionalId2 -> Collections.singletonMap(tp1, Errors.PRODUCER_FENCED)
     ).asJava
-    
+
     assertEquals(expectedErrors, response.errors())
   }
 
@@ -2426,7 +2427,7 @@ class KafkaApisTest extends Logging {
     )
 
     val response = verifyNoThrottling[AddPartitionsToTxnResponse](requestChannelRequest)
-    
+
     def checkErrorForTp(tp: TopicPartition, expectedError: Errors): Unit = {
       val error = if (version < 4)
         response.errors().get(AddPartitionsToTxnResponse.V3_AND_BELOW_TXN_ID).get(tp)
@@ -6390,7 +6391,7 @@ class KafkaApisTest extends Logging {
     val header = RequestHeader.parse(buffer)
     // DelegationTokens require the context authenticated to be non SecurityProtocol.PLAINTEXT
     // and have a non KafkaPrincipal.ANONYMOUS principal. This test is done before the check
-    // for forwarding because after forwarding the context will have a different context. 
+    // for forwarding because after forwarding the context will have a different context.
     // We validate the context authenticated failure case in other integration tests.
     val context = new RequestContext(header, "1", InetAddress.getLocalHost, Optional.empty(),
       new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "Alice"), listenerName, SecurityProtocol.SSL,
@@ -7185,7 +7186,7 @@ class KafkaApisTest extends Logging {
 
   @Test
   // Test that in KRaft mode, a request that isn't forwarded gets the correct error message.
-  // We skip the pre-forward checks in handleCreateTokenRequest 
+  // We skip the pre-forward checks in handleCreateTokenRequest
   def testRaftShouldAlwaysForwardCreateTokenRequest(): Unit = {
     metadataCache = MetadataCache.kRaftMetadataCache(brokerId, () => KRaftVersion.KRAFT_VERSION_0)
     kafkaApis = createKafkaApis(raftSupport = true)
@@ -7194,7 +7195,7 @@ class KafkaApisTest extends Logging {
 
   @Test
   // Test that in KRaft mode, a request that isn't forwarded gets the correct error message.
-  // We skip the pre-forward checks in handleRenewTokenRequest 
+  // We skip the pre-forward checks in handleRenewTokenRequest
   def testRaftShouldAlwaysForwardRenewTokenRequest(): Unit = {
     metadataCache = MetadataCache.kRaftMetadataCache(brokerId, () => KRaftVersion.KRAFT_VERSION_0)
     kafkaApis = createKafkaApis(raftSupport = true)
@@ -7203,7 +7204,7 @@ class KafkaApisTest extends Logging {
 
   @Test
   // Test that in KRaft mode, a request that isn't forwarded gets the correct error message.
-  // We skip the pre-forward checks in handleExpireTokenRequest 
+  // We skip the pre-forward checks in handleExpireTokenRequest
   def testRaftShouldAlwaysForwardExpireTokenRequest(): Unit = {
     metadataCache = MetadataCache.kRaftMetadataCache(brokerId, () => KRaftVersion.KRAFT_VERSION_0)
     kafkaApis = createKafkaApis(raftSupport = true)

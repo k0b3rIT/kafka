@@ -30,6 +30,7 @@ import static org.apache.kafka.common.config.ConfigDef.Importance.MEDIUM;
 import static org.apache.kafka.common.config.ConfigDef.Range.atLeast;
 import static org.apache.kafka.common.config.ConfigDef.Type.BOOLEAN;
 import static org.apache.kafka.common.config.ConfigDef.Type.INT;
+import static org.apache.kafka.common.config.ConfigDef.Type.LIST;
 import static org.apache.kafka.common.config.ConfigDef.Type.LONG;
 import static org.apache.kafka.common.config.ConfigDef.Type.STRING;
 
@@ -124,6 +125,13 @@ public class ServerConfigs {
     public static final int MAX_REQUEST_PARTITION_SIZE_LIMIT_DEFAULT = 2000;
     public static final String MAX_REQUEST_PARTITION_SIZE_LIMIT_DOC = "The maximum number of partitions can be served in one request.";
 
+    /************* Auditor Configuration ***********/
+    public static final String AUDITOR_CLASSES_CONFIG = "cloudera.auditors";
+    public static final String AUDITOR_CLASSES_DEFAULT = "";
+    public static final String AUDITOR_CLASSES_DOC = "The fully qualified name of a class that implements s${classOf[Auditor].getName}" +
+        " interface, which is used for capturing events such as topic creation/deletion," +
+        " ACL creation/deletion or connecting/disconnecting clients after the event happened.";
+
     /** Internal Configurations **/
     public static final String UNSTABLE_API_VERSIONS_ENABLE_CONFIG = "unstable.api.versions.enable";
     public static final String UNSTABLE_FEATURE_VERSIONS_ENABLE_CONFIG = "unstable.feature.versions.enable";
@@ -152,6 +160,8 @@ public class ServerConfigs {
             /************* Authorizer Configuration ***********/
             .define(AUTHORIZER_CLASS_NAME_CONFIG, STRING, AUTHORIZER_CLASS_NAME_DEFAULT, new ConfigDef.NonNullValidator(), LOW, AUTHORIZER_CLASS_NAME_DOC)
             .define(EARLY_START_LISTENERS_CONFIG, STRING, null,  HIGH, EARLY_START_LISTENERS_DOC)
+            /************* Auditor Configuration ***********/
+            .define(AUDITOR_CLASSES_CONFIG, LIST, AUDITOR_CLASSES_DEFAULT, LOW, AUDITOR_CLASSES_DOC)
             /************ Rack Configuration ******************/
             .define(BROKER_RACK_CONFIG, STRING, null, MEDIUM, BROKER_RACK_DOC)
             /** ********* Controlled shutdown configuration ***********/

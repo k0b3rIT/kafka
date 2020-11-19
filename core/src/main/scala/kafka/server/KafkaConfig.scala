@@ -41,6 +41,7 @@ import org.apache.kafka.raft.QuorumConfig
 import org.apache.kafka.security.authorizer.AuthorizerUtils
 import org.apache.kafka.security.PasswordEncoderConfigs
 import org.apache.kafka.server.ProcessRole
+import org.apache.kafka.server.auditor.Auditor
 import org.apache.kafka.server.authorizer.Authorizer
 import org.apache.kafka.server.common.MetadataVersion
 import org.apache.kafka.server.common.MetadataVersion._
@@ -409,6 +410,10 @@ class KafkaConfig private(doLog: Boolean, val props: util.Map[_, _])
         }.toSet
     }
   }
+
+  /************* Auditor Configuration ***********/
+  val auditors: List[Auditor] = getList(ServerConfigs.AUDITOR_CLASSES_CONFIG)
+    .asScala.map(Utils.newInstance(_, classOf[Auditor])).toList
 
   /** ********* Socket Server Configuration ***********/
   val socketSendBufferBytes = getInt(SocketServerConfigs.SOCKET_SEND_BUFFER_BYTES_CONFIG)

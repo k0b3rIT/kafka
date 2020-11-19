@@ -267,6 +267,10 @@
     <!-- This is required to make AlterConfigPolicyTest work. -->
     <allow pkg="org.apache.kafka.server.policy" />
 
+    <subpackage name="auditor">
+      <allow pkg="org.apache.kafka.server" />
+    </subpackage>
+
     <subpackage name="telemetry">
       <allow class="org.apache.kafka.server.authorizer.AuthorizableRequestContext" />
     </subpackage>

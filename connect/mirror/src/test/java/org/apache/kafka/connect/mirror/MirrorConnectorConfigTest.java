@@ -57,6 +57,7 @@ public class MirrorConnectorConfigTest {
         expectedConsumerProps.put("max.poll.interval.ms", "120000");
         expectedConsumerProps.put("client.id", "source1->target2|ConnectorName|test");
         expectedConsumerProps.put("bootstrap.servers", "localhost:2345");
+        expectedConsumerProps.put("allow.auto.create.topics", false);
         assertEquals(expectedConsumerProps, connectorConsumerProps);
 
         // checking auto.offset.reset override works
@@ -83,6 +84,7 @@ public class MirrorConnectorConfigTest {
         Map<String, Object> connectorConsumerProps = config.sourceConsumerConfig("test");
         Map<String, Object> expectedConsumerProps = new HashMap<>();
         expectedConsumerProps.put("enable.auto.commit", "false");
+        expectedConsumerProps.put("allow.auto.create.topics", false);
         expectedConsumerProps.put("auto.offset.reset", "latest");
         expectedConsumerProps.put("max.poll.interval.ms", "100");
         expectedConsumerProps.put("client.id", "source1->target2|ConnectorName|test");

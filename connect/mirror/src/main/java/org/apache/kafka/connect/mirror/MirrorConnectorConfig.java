@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.kafka.clients.consumer.ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG;
 import static org.apache.kafka.common.config.ConfigDef.CaseInsensitiveValidString.in;
@@ -97,6 +98,10 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
     public static final String FORWARDING_ADMIN_CLASS = MirrorClientConfig.FORWARDING_ADMIN_CLASS;
     public static final Class<?> FORWARDING_ADMIN_CLASS_DEFAULT = MirrorClientConfig.FORWARDING_ADMIN_CLASS_DEFAULT;
     private static final String FORWARDING_ADMIN_CLASS_DOC = MirrorClientConfig.FORWARDING_ADMIN_CLASS_DOC;
+
+    public static final String DISABLE_SOURCE_TOPIC_AUTO_CREATION = "disable.source.topic.auto.creation";
+    private static final String DISABLE_SOURCE_TOPIC_AUTO_CREATION_DOC = "Whether to disable the auto topic creation in the source cluster when fetching data. If enabled, source topics might get re-created by replication after deletion. Sets the '" + ALLOW_AUTO_CREATE_TOPICS_CONFIG + "' configuration of the underlying consumer.";
+    public static final boolean DISABLE_SOURCE_TOPIC_AUTO_CREATION_DEFAULT = true;
 
     protected static final String SOURCE_CLUSTER_PREFIX = MirrorMakerConfig.SOURCE_CLUSTER_PREFIX;
     protected static final String TARGET_CLUSTER_PREFIX = MirrorMakerConfig.TARGET_CLUSTER_PREFIX;
@@ -169,6 +174,9 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
 
     Map<String, Object> sourceConsumerConfig(String role) {
         Map<String, Object> result = sourceConsumerConfig(originals());
+        if (!result.containsKey(ALLOW_AUTO_CREATE_TOPICS_CONFIG)) {
+            result.put(ALLOW_AUTO_CREATE_TOPICS_CONFIG, !disableSourceTopicAutoCreation());
+        }
         addClientId(result, role);
         return result;
     }
@@ -258,6 +266,10 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
         return sourceClusterAlias() + "->" + targetClusterAlias() + "|" + connectorName();
     }
 
+    private boolean disableSourceTopicAutoCreation() {
+        return getBoolean(DISABLE_SOURCE_TOPIC_AUTO_CREATION);
+    }
+
     @SuppressWarnings("deprecation")
     protected static final ConfigDef BASE_CONNECTOR_CONFIG_DEF = new ConfigDef(ConnectorConfig.configDef())
             .define(
@@ -325,8 +337,14 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
                     ConfigDef.Type.BOOLEAN,
                     true,
                     ConfigDef.Importance.LOW,
-                    CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_DOC
-            ).withClientSslSupport()
+                    CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_DOC)
+            .define(
+                    DISABLE_SOURCE_TOPIC_AUTO_CREATION,
+                    ConfigDef.Type.BOOLEAN,
+                    DISABLE_SOURCE_TOPIC_AUTO_CREATION_DEFAULT,
+                    ConfigDef.Importance.LOW,
+                    DISABLE_SOURCE_TOPIC_AUTO_CREATION_DOC)
+            .withClientSslSupport()
             .withClientSaslSupport();
 
     public static void main(String[] args) {

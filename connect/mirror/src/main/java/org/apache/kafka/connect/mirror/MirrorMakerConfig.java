@@ -84,6 +84,8 @@ public class MirrorMakerConfig extends AbstractConfig {
     static final String ENABLE_INTERNAL_REST_CONFIG = "dedicated.mode.enable.internal.rest";
     private static final String ENABLE_INTERNAL_REST_DOC =
             "Whether to bring up an internal-only REST server that allows multi-node clusters to operate correctly.";
+    static final String GLOBAL_WORKER_CONFIG_PREFIX = "workers.";
+    static final String GLOBAL_CONNECTOR_CONFIG_PREFIX = "connectors.";
 
     private final Plugins plugins;
 
@@ -194,6 +196,16 @@ public class MirrorMakerConfig extends AbstractConfig {
         props.putAll(stringsWithPrefix("worker"));
         props.putAll(stringsWithPrefix("replication.policy"));
 
+        // Other global worker configs
+        props.putAll(stringsWithPrefixStripped(GLOBAL_WORKER_CONFIG_PREFIX));
+
+        // Other global worker configs
+        props.putAll(stringsWithPrefixStripped(GLOBAL_WORKER_CONFIG_PREFIX));
+
+        // Per-worker overrides
+        props.putAll(stringsWithPrefixStripped(sourceAndTarget.source() + "->"
+            + sourceAndTarget.target() + ".worker."));
+
         // transform any expression like ${provider:path:key}, since the worker doesn't do so
         props = transform(props);
         props.putAll(stringsWithPrefix(CONFIG_PROVIDERS_CONFIG));
@@ -251,6 +263,9 @@ public class MirrorMakerConfig extends AbstractConfig {
         props.putIfAbsent(CONNECTOR_CLASS, connectorClass.getName());
         props.putIfAbsent(SOURCE_CLUSTER_ALIAS, sourceAndTarget.source());
         props.putIfAbsent(TARGET_CLUSTER_ALIAS, sourceAndTarget.target());
+
+        // global connector properties
+        props.putAll(stringsWithPrefixStripped(GLOBAL_CONNECTOR_CONFIG_PREFIX));
 
         // override with connector-level properties
         props.putAll(stringsWithPrefixStripped(sourceAndTarget.source() + "->"

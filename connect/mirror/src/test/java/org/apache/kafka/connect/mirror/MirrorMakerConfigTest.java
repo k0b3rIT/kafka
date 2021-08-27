@@ -145,6 +145,7 @@ public class MirrorMakerConfigTest {
             "config.properties.exclude", "property-3",
             "metric.reporters", "FakeMetricsReporter",
             "topic.filter.class", DefaultTopicFilter.class.getName(),
+            MirrorMakerConfig.GLOBAL_CONNECTOR_CONFIG_PREFIX + "global.connector.config", "something",
             "xxx", "yyy"));
         SourceAndTarget sourceAndTarget = new SourceAndTarget("source", "target");
         Map<String, String> connectorProps = mirrorConfig.connectorBaseConfig(sourceAndTarget,
@@ -162,13 +163,14 @@ public class MirrorMakerConfigTest {
                 "Filters should be passed through to underlying Connectors.");
         assertEquals("__", sourceConfig.getString("replication.policy.separator"),
                 "replication policy separator should be passed through to underlying Connectors.");
+        assertEquals("something", sourceConfig.originals().get("global.connector.config"),
+            "Global connector configs should be passed to underlying Connectors.");
         assertFalse(sourceConfig.originals().containsKey("xxx"),
                 "Unknown properties should not be passed through to Connectors.");
 
         MirrorCheckpointConfig checkpointConfig = new MirrorCheckpointConfig(connectorProps);
         assertEquals(Collections.singletonList("group-2"), checkpointConfig.getList("groups"),
             "Groups include should be passed through to underlying Connectors.");
-
     }
 
     @Test
@@ -250,6 +252,7 @@ public class MirrorMakerConfigTest {
             "b.producer.security.protocol", "SASL",
             "ssl.truststore.password", "secret1",
             "ssl.key.password", "${fake:secret:password}",  // resolves to "secret2"
+            MirrorMakerConfig.GLOBAL_WORKER_CONFIG_PREFIX + "global.worker.config", "something",
             "b.xxx", "yyy"));
         SourceAndTarget a = new SourceAndTarget("b", "a");
         SourceAndTarget b = new SourceAndTarget("a", "b");
@@ -278,6 +281,10 @@ public class MirrorMakerConfigTest {
         assertEquals("secret2", bProps.get("producer.ssl.key.password"),
             "security properties should be transformed in worker producer config");
         assertEquals("__", bProps.get("replication.policy.separator"));
+        assertEquals("something", aProps.get("global.worker.config"),
+            "Global worker configs should be passed to the worker config.");
+        assertEquals("something", bProps.get("global.worker.config"),
+            "Global worker configs should be passed to the worker config.");
     }
 
     @Test

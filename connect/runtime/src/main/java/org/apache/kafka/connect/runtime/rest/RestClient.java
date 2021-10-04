@@ -17,6 +17,7 @@
 
 package org.apache.kafka.connect.runtime.rest;
 
+import com.cloudera.kafka.connect.trustedproxy.RestClientConfigurator;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.connect.runtime.distributed.Crypto;
 import org.apache.kafka.connect.runtime.rest.entities.ErrorMessage;
@@ -129,6 +130,7 @@ public class RestClient {
         HttpClient client = httpClient(sslContextFactory);
         client.setFollowRedirects(false);
 
+
         try {
             client.start();
         } catch (Exception e) {
@@ -137,7 +139,8 @@ public class RestClient {
         }
 
         try {
-            return httpRequest(client, url, method, headers, requestBodyData, responseFormat, sessionKey, requestSignatureAlgorithm);
+            boolean forwardAuthorizationHeader = RestClientConfigurator.configureClient(client, url, config);
+            return httpRequest(client, url, method, headers, requestBodyData, responseFormat, sessionKey, requestSignatureAlgorithm, forwardAuthorizationHeader);
         } finally {
             try {
                 client.stop();
@@ -150,7 +153,7 @@ public class RestClient {
     private <T> HttpResponse<T> httpRequest(HttpClient client, String url, String method,
                                            HttpHeaders headers, Object requestBodyData,
                                            TypeReference<T> responseFormat, SecretKey sessionKey,
-                                           String requestSignatureAlgorithm) {
+                                           String requestSignatureAlgorithm, boolean forwardAuthorizationHeader) {
         try {
             String serializedBody = requestBodyData == null ? null : JSON_SERDE.writeValueAsString(requestBodyData);
             log.trace("Sending {} with input {} to {}", method, serializedBody, url);
@@ -159,7 +162,9 @@ public class RestClient {
             req.method(method);
             req.accept("application/json");
             req.agent("kafka-connect");
-            addHeadersToRequest(headers, req);
+            if (forwardAuthorizationHeader) {
+                addHeadersToRequest(headers, req);
+            }
 
             if (serializedBody != null) {
                 req.content(new StringContentProvider(serializedBody, StandardCharsets.UTF_8), "application/json");

@@ -1,6 +1,6 @@
 <!DOCTYPE import-control PUBLIC
-"-//Puppy Crawl//DTD Import Control 1.1//EN"
-"http://www.puppycrawl.com/dtds/import_control_1_1.dtd">
+        "-//Checkstyle//DTD ImportControl Configuration 1.4//EN"
+        "https://checkstyle.org/dtds/import_control_1_4.dtd">
 <!--
  Licensed to the Apache Software Foundation (ASF) under one or more
  contributor license agreements.  See the NOTICE file distributed with
@@ -18,7 +18,7 @@
  limitations under the License.
 -->
 
-<import-control pkg="org.apache.kafka">
+<import-control pkg="org.apache.kafka|com.cloudera.kafka" regex="true">
 
   <!-- THINK HARD ABOUT THE LAYERING OF THE PROJECT BEFORE CHANGING THIS FILE -->
 
@@ -495,6 +495,8 @@
 
   <subpackage name="connect">
     <allow pkg="org.apache.kafka.common" />
+    <allow pkg="com.cloudera.kafka.connect.authorization" />
+    <allow pkg="com.cloudera.kafka.connect.trustedproxy" />
     <allow pkg="org.apache.kafka.connect.data" />
     <allow pkg="org.apache.kafka.connect.errors" />
     <allow pkg="org.apache.kafka.connect.header" />
@@ -505,6 +507,15 @@
     <allow pkg="org.apache.kafka.coordinator.group" />
     <allow pkg="org.apache.kafka.network" />
     <allow pkg="org.apache.log4j" />
+
+    <subpackage name="trustedproxy">
+      <allow pkg="org.eclipse.jetty.client" />
+      <allow pkg="org.eclipse.jetty.security" />
+      <allow pkg="org.eclipse.jetty.server" />
+      <allow pkg="org.eclipse.jetty.util" />
+      <allow pkg="javax.servlet" />
+      <allow pkg="org.apache.kafka.connect.runtime" />
+    </subpackage>
 
     <subpackage name="source">
       <allow pkg="org.apache.kafka.connect.connector" />
@@ -536,6 +547,21 @@
       <subpackage name="basic">
         <allow pkg="org.apache.kafka.connect.rest"/>
         <allow pkg="javax.annotation"/>
+      </subpackage>
+
+      <subpackage name="authorization">
+        <subpackage name="extension">
+          <allow pkg="com.cloudera.kafka.connect" />
+          <allow pkg="org.apache.kafka.connect.rest"/>
+          <allow pkg="org.apache.kafka.connect.runtime"/>
+
+          <allow pkg="org.apache.http" />
+          <allow pkg="org.eclipse.jetty" />
+          <allow pkg="com.fasterxml.jackson" />
+          <allow pkg="org.glassfish.jersey" />
+          <allow pkg="javax.annotation" />
+          <allow pkg="com.sun.net.httpserver" />
+        </subpackage>
       </subpackage>
     </subpackage>
 

@@ -50,6 +50,7 @@ buildCache {
 include 'clients',
     'connect:api',
     'connect:basic-auth-extension',
+    'connect:cloudera-authorization-extension',
     'connect:file',
     'connect:json',
     'connect:mirror',

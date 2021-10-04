@@ -868,6 +868,7 @@ if (userEnableTestCoverage) {
 def connectPkgs = [
     'connect:api',
     'connect:basic-auth-extension',
+    'connect:cloudera-authorization-extension',
     'connect:file',
     'connect:json',
     'connect:runtime',
@@ -1213,6 +1214,8 @@ project(':core') {
     from(project(':connect:file').configurations.runtimeClasspath) { into("libs/") }
     from(project(':connect:basic-auth-extension').jar) { into("libs/") }
     from(project(':connect:basic-auth-extension').configurations.runtimeClasspath) { into("libs/") }
+    from(project(':connect:cloudera-authorization-extension').jar) { into("libs/") }
+    from(project(':connect:cloudera-authorization-extension').configurations.runtimeClasspath) { into("libs/") }
     from(project(':connect:mirror').jar) { into("libs/") }
     from(project(':connect:mirror').configurations.runtimeClasspath) { into("libs/") }
     from(project(':connect:mirror-client').jar) { into("libs/") }
@@ -3667,6 +3670,55 @@ project(':connect:mirror-client') {
   jar {
     dependsOn copyDependantLibs
   }
+}
+
+project(':connect:cloudera-authorization-extension') {
+  archivesBaseName = "connect-cloudera-authorization-extension"
+
+  dependencies {
+    implementation project(':connect:api')
+    implementation project(':tools')
+
+    implementation libs.jacksonJaxrsJsonProvider
+    implementation libs.jerseyContainerServlet
+    implementation libs.slf4jApi
+    implementation libs.swaggerAnnotations
+    implementation libs.slf4jReload4j
+    implementation libs.reload4j
+
+    testImplementation libs.easymock
+    testImplementation libs.junitJupiter
+    testImplementation libs.jettyServer
+    testImplementation libs.jettyServlet
+    testImplementation libs.jettyServlets
+    testImplementation libs.httpclient
+    testImplementation project(':connect:runtime')
+    testImplementation project(':clients').sourceSets.test.output
+
+    testRuntimeOnly libs.slf4jReload4j
+  }
+
+  javadoc {
+    enabled = false
+  }
+
+  tasks.create(name: "copyDependantLibs", type: Copy) {
+    from (configurations.testRuntimeClasspath) {
+      include('slf4j-log4j12*')
+      include('log4j*jar')
+    }
+    from (configurations.runtimeClasspath) {
+      exclude('kafka-clients*')
+      exclude('connect-*')
+    }
+    into "$buildDir/dependant-libs"
+    duplicatesStrategy 'exclude'
+  }
+
+  jar {
+    dependsOn copyDependantLibs
+  }
+
 }
 
 project(':connect:test-plugins') {

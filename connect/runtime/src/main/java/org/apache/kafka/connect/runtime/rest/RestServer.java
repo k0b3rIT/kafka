@@ -16,6 +16,9 @@
  */
 package org.apache.kafka.connect.runtime.rest;
 
+import com.cloudera.kafka.connect.trustedproxy.SpnegoConfig;
+import com.cloudera.kafka.connect.trustedproxy.TrustedProxyProvider;
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -286,7 +289,7 @@ public abstract class RestServer {
             configureHttpResponseHeaderFilter(context, headerConfig);
         }
 
-        disableHttpTrace(contextHandlers, context);
+        createSecurityHandlerForResources(config, context, contextHandlers);
         handlers.setHandlers(contextHandlers.toArray(new Handler[0]));
         try {
             context.start();
@@ -611,4 +614,21 @@ public abstract class RestServer {
         return constraintSecurityHandler;
     }
 
+    private void addSpnegoSecurityHandler(SpnegoConfig config, ServletContextHandler context, List<Handler> contextHandlers) {
+        context.setSecurityHandler(TrustedProxyProvider.createSpnegoSecurityHandler(config));
+        contextHandlers.forEach(h -> {
+            if (h instanceof ServletContextHandler) {
+                ((ServletContextHandler) h).setSecurityHandler(TrustedProxyProvider.createSpnegoSecurityHandler(config));
+            }
+        });
+    }
+
+    private void createSecurityHandlerForResources(RestServerConfig config, ServletContextHandler context, List<Handler> contextHandlers) {
+        SpnegoConfig spnegoConfig = new SpnegoConfig(config.originals());
+        if (spnegoConfig.isSpnegoEnabled()) {
+            addSpnegoSecurityHandler(spnegoConfig, context, contextHandlers);
+        } else {
+            disableHttpTrace(contextHandlers, context);
+        }
+    }
 }

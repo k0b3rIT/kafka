@@ -194,6 +194,7 @@ libs += [
   commonsCli: "commons-cli:commons-cli:$versions.commonsCli",
   commonsIo: "commons-io:commons-io:$versions.commonsIo",
   commonsValidator: "commons-validator:commons-validator:$versions.commonsValidator",
+  easymock: "org.easymock:easymock:$versions.easymock",
   jacksonAnnotations: "com.fasterxml.jackson.core:jackson-annotations:$versions.jackson",
   jacksonDatabind: "com.fasterxml.jackson.core:jackson-databind:$versions.jackson",
   jacksonDataformatCsv: "com.fasterxml.jackson.dataformat:jackson-dataformat-csv:$versions.jackson",

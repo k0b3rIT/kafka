@@ -47,6 +47,9 @@ public class MirrorSourceTask extends SourceTask {
 
     private static final Logger log = LoggerFactory.getLogger(MirrorSourceTask.class);
 
+    private static final int MAX_OUTSTANDING_OFFSET_SYNCS = 10;
+    static final String SOURCE_OFFSET_HEADER_KEY = "mm2-source-offset";
+
     private KafkaConsumer<byte[], byte[]> consumer;
     private String sourceClusterAlias;
     private Duration pollTimeout;
@@ -55,19 +58,21 @@ public class MirrorSourceTask extends SourceTask {
     private boolean stopping = false;
     private Semaphore consumerAccess;
     private OffsetSyncWriter offsetSyncWriter;
+    private boolean copySourceOffsetIntoHeader;
 
     public MirrorSourceTask() {}
 
     // for testing
     MirrorSourceTask(KafkaConsumer<byte[], byte[]> consumer, MirrorSourceMetrics metrics, String sourceClusterAlias,
                      ReplicationPolicy replicationPolicy,
-                     OffsetSyncWriter offsetSyncWriter) {
+                     OffsetSyncWriter offsetSyncWriter, boolean copySourceOffsetIntoHeader) {
         this.consumer = consumer;
         this.metrics = metrics;
         this.sourceClusterAlias = sourceClusterAlias;
         this.replicationPolicy = replicationPolicy;
         consumerAccess = new Semaphore(1);
         this.offsetSyncWriter = offsetSyncWriter;
+        this.copySourceOffsetIntoHeader = copySourceOffsetIntoHeader;
     }
 
     @Override
@@ -82,6 +87,7 @@ public class MirrorSourceTask extends SourceTask {
             offsetSyncWriter = new OffsetSyncWriter(config);
         }
         consumer = MirrorUtils.newConsumer(config.sourceConsumerConfig("replication-consumer"));
+        copySourceOffsetIntoHeader = config.copySourceOffsetIntoHeader();
         Set<TopicPartition> taskTopicPartitions = config.taskTopicPartitions();
         initializeConsumer(taskTopicPartitions);
 
@@ -232,12 +238,35 @@ public class MirrorSourceTask extends SourceTask {
                 record.timestamp(), headers);
     }
 
-    private Headers convertHeaders(ConsumerRecord<byte[], byte[]> record) {
+    // visible for testing
+    Headers convertHeaders(ConsumerRecord<byte[], byte[]> record) {
         ConnectHeaders headers = new ConnectHeaders();
+        boolean sourceOffsetHeaderCopied = false;
         for (Header header : record.headers()) {
-            headers.addBytes(header.key(), header.value());
+            if (copySourceOffsetIntoHeader && SOURCE_OFFSET_HEADER_KEY.equals(header.key())) {
+                byte[] value = createSourceOffsetsStructAndSerialize(record.offset(), header);
+                //Instead of copy, we update this header
+                headers.addBytes(header.key(), value);
+                sourceOffsetHeaderCopied = true;
+            } else {
+                headers.addBytes(header.key(), header.value());
+            }
+        }
+        if (copySourceOffsetIntoHeader && !sourceOffsetHeaderCopied) {
+            //No source offset header in the record yet, let's add it
+            byte[] value = createSourceOffsetsStructAndSerialize(record.offset(), null);
+            headers.addBytes(SOURCE_OFFSET_HEADER_KEY, value);
         }
         return headers;
+    }
+
+    private byte[] createSourceOffsetsStructAndSerialize(long offset, Header existingSourceOffsets) {
+        SourceOffsets sourceOffsets = new SourceOffsets();
+        if (existingSourceOffsets != null) {
+            sourceOffsets.deserialize(existingSourceOffsets.value());
+        }
+        sourceOffsets.sourceOffsets().put(sourceClusterAlias, offset);
+        return sourceOffsets.serialize().array();
     }
 
     private String formatRemoteTopic(String topic) {

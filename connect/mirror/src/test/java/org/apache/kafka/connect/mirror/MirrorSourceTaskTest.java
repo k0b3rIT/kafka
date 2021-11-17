@@ -69,7 +69,7 @@ public class MirrorSourceTaskTest {
         ConsumerRecord<byte[], byte[]> consumerRecord = new ConsumerRecord<>("topic1", 2, 3L, 4L,
             TimestampType.CREATE_TIME, 5, 6, key, value, headers, Optional.empty());
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(null, null, "cluster7",
-                new DefaultReplicationPolicy(), null);
+                new DefaultReplicationPolicy(), null, false);
         SourceRecord sourceRecord = mirrorSourceTask.convertRecord(consumerRecord);
         assertEquals("cluster7.topic1", sourceRecord.topic(),
                 "Failure on cluster7.topic1 consumerRecord serde");
@@ -188,7 +188,7 @@ public class MirrorSourceTaskTest {
         String sourceClusterName = "cluster1";
         ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(consumer, metrics, sourceClusterName,
-                replicationPolicy, null);
+                replicationPolicy, null, false);
         List<SourceRecord> sourceRecords = mirrorSourceTask.poll();
 
         assertEquals(2, sourceRecords.size());
@@ -248,7 +248,7 @@ public class MirrorSourceTaskTest {
         });
 
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(mockConsumer, null, null,
-                new DefaultReplicationPolicy(), null);
+                new DefaultReplicationPolicy(), null, false);
         mirrorSourceTask.initialize(mockSourceTaskContext);
 
         // Call test subject
@@ -289,7 +289,7 @@ public class MirrorSourceTaskTest {
         String sourceClusterName = "cluster1";
         ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(consumer, metrics, sourceClusterName,
-                replicationPolicy, null);
+                replicationPolicy, null, false);
 
         SourceRecord sourceRecord = mirrorSourceTask.convertRecord(new ConsumerRecord<>(topicName, 0, 0, System.currentTimeMillis(),
                 TimestampType.CREATE_TIME, key1.length, value1.length, key1, value1, headers, Optional.empty()));
@@ -323,7 +323,7 @@ public class MirrorSourceTaskTest {
         doNothing().when(offsetSyncWriter).promoteDelayedOffsetSyncs();
 
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(consumer, metrics, sourceClusterName,
-                replicationPolicy, offsetSyncWriter);
+                replicationPolicy, offsetSyncWriter, false);
 
         SourceRecord sourceRecord = mirrorSourceTask.convertRecord(new ConsumerRecord<>(topicName, recordPartition,
                 recordOffset, System.currentTimeMillis(), TimestampType.CREATE_TIME, recordKey.length,
@@ -343,6 +343,64 @@ public class MirrorSourceTaskTest {
         // No more syncs should take place; we've been able to publish all of them so far
         verify(offsetSyncWriter, times(1)).promoteDelayedOffsetSyncs();
         verify(offsetSyncWriter, times(2)).firePendingOffsetSyncs();
+    }
+
+    @Test
+    public void testSourceOffsetCopyIntoHeaders() {
+        String sourceClusterName = "cluster1";
+        String topicName = "test";
+        byte[] key1 = "abc".getBytes();
+        byte[] value1 = "fgh".getBytes();
+        RecordHeaders recordHeaders = new RecordHeaders(new Header[0]);
+        ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>(topicName, 0, 2, System.currentTimeMillis(),
+            TimestampType.CREATE_TIME, 0L, key1.length, value1.length, key1, value1, recordHeaders);
+        Map<String, Long> expectedSourceOffsetsMap = new HashMap<>();
+        expectedSourceOffsetsMap.put(sourceClusterName, record.offset());
+
+        ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
+        @SuppressWarnings("unchecked")
+        MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(mock(KafkaConsumer.class), mock(MirrorSourceMetrics.class),
+            sourceClusterName, replicationPolicy, mock(OffsetSyncWriter.class), true);
+
+        org.apache.kafka.connect.header.Headers headers = mirrorSourceTask.convertHeaders(record);
+
+        assertEquals(1, headers.size());
+        org.apache.kafka.connect.header.Header sourceOffsetsHeader =
+            headers.lastWithName(MirrorSourceTask.SOURCE_OFFSET_HEADER_KEY);
+        SourceOffsets sourceOffsets = new SourceOffsets();
+        sourceOffsets.deserialize((byte[]) sourceOffsetsHeader.value());
+        assertEquals(expectedSourceOffsetsMap, sourceOffsets.sourceOffsets());
+    }
+
+    @Test
+    public void testSourceOffsetCopyIntoExistingHeaders() {
+        String sourceClusterName = "cluster1";
+        String topicName = "test";
+        byte[] key1 = "abc".getBytes();
+        byte[] value1 = "fgh".getBytes();
+        SourceOffsets existingSourceOffsetRecord = new SourceOffsets();
+        existingSourceOffsetRecord.sourceOffsets().put("some_other_cluster", 85L);
+        RecordHeaders recordHeaders = new RecordHeaders(new Header[] {
+            new RecordHeader(MirrorSourceTask.SOURCE_OFFSET_HEADER_KEY, existingSourceOffsetRecord.serialize().array()),
+        });
+        ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>(topicName, 0, 2, System.currentTimeMillis(),
+            TimestampType.CREATE_TIME, 0L, key1.length, value1.length, key1, value1, recordHeaders);
+        Map<String, Long> expectedSourceOffsetsMap = new HashMap<>(existingSourceOffsetRecord.sourceOffsets());
+        expectedSourceOffsetsMap.put(sourceClusterName, record.offset());
+
+        ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
+        @SuppressWarnings("unchecked")
+        MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(mock(KafkaConsumer.class), mock(MirrorSourceMetrics.class),
+            sourceClusterName, replicationPolicy, mock(OffsetSyncWriter.class), true);
+
+        org.apache.kafka.connect.header.Headers headers = mirrorSourceTask.convertHeaders(record);
+
+        assertEquals(1, headers.size());
+        org.apache.kafka.connect.header.Header sourceOffsetsHeader =
+            headers.lastWithName(MirrorSourceTask.SOURCE_OFFSET_HEADER_KEY);
+        SourceOffsets actualSourceOffsets = new SourceOffsets();
+        actualSourceOffsets.deserialize((byte[]) sourceOffsetsHeader.value());
+        assertEquals(expectedSourceOffsetsMap, actualSourceOffsets.sourceOffsets());
     }
 
     private void compareHeaders(List<Header> expectedHeaders, List<org.apache.kafka.connect.header.Header> taskHeaders) {

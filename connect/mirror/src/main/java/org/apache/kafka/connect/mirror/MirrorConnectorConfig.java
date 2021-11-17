@@ -103,6 +103,10 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
     private static final String DISABLE_SOURCE_TOPIC_AUTO_CREATION_DOC = "Whether to disable the auto topic creation in the source cluster when fetching data. If enabled, source topics might get re-created by replication after deletion. Sets the '" + ALLOW_AUTO_CREATE_TOPICS_CONFIG + "' configuration of the underlying consumer.";
     public static final boolean DISABLE_SOURCE_TOPIC_AUTO_CREATION_DEFAULT = true;
 
+    public static final String COPY_SOURCE_OFFSET_IN_HEADER_ENABLED = "copy.source.offset.in.header.enabled";
+    private static final boolean COPY_SOURCE_OFFSET_IN_HEADER_ENABLED_DEFAULT = false;
+    private static final String COPY_SOURCE_OFFSET_IN_HEADER_ENABLED_DOC = "Whether to enable copying the source offset into the header of the replicated records.";
+
     protected static final String SOURCE_CLUSTER_PREFIX = MirrorMakerConfig.SOURCE_CLUSTER_PREFIX;
     protected static final String TARGET_CLUSTER_PREFIX = MirrorMakerConfig.TARGET_CLUSTER_PREFIX;
     protected static final String SOURCE_PREFIX = MirrorMakerConfig.SOURCE_PREFIX;
@@ -270,6 +274,11 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
         return getBoolean(DISABLE_SOURCE_TOPIC_AUTO_CREATION);
     }
 
+
+    boolean copySourceOffsetIntoHeader() {
+        return getBoolean(COPY_SOURCE_OFFSET_IN_HEADER_ENABLED);
+    }
+
     @SuppressWarnings("deprecation")
     protected static final ConfigDef BASE_CONNECTOR_CONFIG_DEF = new ConfigDef(ConnectorConfig.configDef())
             .define(
@@ -344,6 +353,12 @@ public abstract class MirrorConnectorConfig extends AbstractConfig {
                     DISABLE_SOURCE_TOPIC_AUTO_CREATION_DEFAULT,
                     ConfigDef.Importance.LOW,
                     DISABLE_SOURCE_TOPIC_AUTO_CREATION_DOC)
+            .define(
+                    COPY_SOURCE_OFFSET_IN_HEADER_ENABLED,
+                    ConfigDef.Type.BOOLEAN,
+                    COPY_SOURCE_OFFSET_IN_HEADER_ENABLED_DEFAULT,
+                    ConfigDef.Importance.LOW,
+                    COPY_SOURCE_OFFSET_IN_HEADER_ENABLED_DOC)
             .withClientSslSupport()
             .withClientSaslSupport();
 

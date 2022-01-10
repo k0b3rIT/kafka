@@ -30,6 +30,7 @@
   <allow pkg="org.opentest4j" />
   <allow pkg="org.hamcrest" />
   <allow pkg="org.mockito" />
+  <allow pkg="org.easymock" />
   <allow pkg="java.security" />
   <allow class="javax.net.SocketFactory" />
   <allow class="org.apache.commons.lang.SystemUtils"/>
@@ -702,6 +703,36 @@
       <allow class="org.apache.kafka.connect.sink.SinkRecord" />
       <allow pkg="org.apache.kafka.connect.transforms.util" />
       <allow pkg="org.apache.kafka.connect.transforms.field" />
+    </subpackage>
+
+    <subpackage name="secret">
+      <allow pkg="com.cloudera.kafka.connect" />
+      <allow pkg="com.cloudera.kafka.connect.common"/>
+      <allow pkg="com.cloudera.kafka.connect.secret"/>
+      <allow pkg="com.cloudera.kafka.connect.secret.store"/>
+      <allow pkg="com.fasterxml.jackson" />
+      <allow pkg="javax.crypto"/>
+      <allow pkg="javax.annotation"/>
+      <allow pkg="javax.crypto.spec"/>
+      <allow pkg="javax.ws.rs" />
+      <allow pkg="kafka.api"/>
+      <allow pkg="org.apache.commons.lang3.tuple"/>
+      <allow pkg="org.apache.http"/>
+      <allow pkg="org.apache.kafka.connect"/>
+      <allow pkg="org.apache.kafka.connect.health"/>
+      <allow pkg="org.apache.kafka.connect.rest"/>
+      <allow pkg="org.apache.kafka.connect.runtime"/>
+      <allow pkg="org.apache.kafka.connect.util"/>
+      <allow pkg="org.awaitility"/>
+      <allow pkg="kafka.utils"/>
+    </subpackage>
+
+    <subpackage name="common">
+      <allow pkg="org.eclipse.jetty"/>
+      <allow pkg="org.glassfish.jersey"/>
+      <allow pkg="org.apache.http"/>
+      <allow pkg="com.fasterxml.jackson"/>
+      <allow pkg="org.apache.kafka.connect.runtime"/>
     </subpackage>
   </subpackage>
 

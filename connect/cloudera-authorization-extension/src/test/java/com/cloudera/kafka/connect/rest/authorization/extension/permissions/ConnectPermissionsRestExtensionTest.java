@@ -20,6 +20,7 @@ package com.cloudera.kafka.connect.rest.authorization.extension.permissions;
 import com.cloudera.kafka.connect.rest.authorization.extension.ConnectAuthorizerInstance;
 import com.cloudera.kafka.connect.rest.authorization.extension.NoopAuthorizer;
 import com.cloudera.kafka.connect.rest.authorization.extension.TestConnectAuthorizer;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

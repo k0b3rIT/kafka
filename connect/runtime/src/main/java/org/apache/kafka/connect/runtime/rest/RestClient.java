@@ -17,13 +17,13 @@
 
 package org.apache.kafka.connect.runtime.rest;
 
-import com.cloudera.kafka.connect.trustedproxy.RestClientConfigurator;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.connect.runtime.distributed.Crypto;
 import org.apache.kafka.connect.runtime.rest.entities.ErrorMessage;
 import org.apache.kafka.connect.runtime.rest.errors.ConnectRestException;
 import org.apache.kafka.connect.runtime.rest.util.SSLUtils;
 
+import com.cloudera.kafka.connect.trustedproxy.RestClientConfigurator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

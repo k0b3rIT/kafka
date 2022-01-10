@@ -17,6 +17,7 @@
 
 package org.apache.kafka.connect.runtime.rest;
 
+import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.rest.entities.ErrorMessage;
 import org.apache.kafka.connect.runtime.rest.errors.ConnectRestException;
 
@@ -25,9 +26,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.kafka.connect.runtime.WorkerConfig;
-import org.apache.kafka.connect.runtime.rest.entities.ErrorMessage;
-import org.apache.kafka.connect.runtime.rest.errors.ConnectRestException;
+
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
@@ -42,8 +41,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -99,7 +96,7 @@ public class RestClientTest {
                                                                 boolean https, boolean configureRestClient) {
         WorkerConfig workerConfig = null;
         if (configureRestClient) {
-            Map < String, Object > originals = new HashMap<>();
+            Map<String, Object> originals = new HashMap<>();
             originals.put(SpnegoConfig.SPNEGO_ENABLED_CONFIG, "false");
             workerConfig = mock(WorkerConfig.class);
             when(workerConfig.originals()).thenReturn(originals);

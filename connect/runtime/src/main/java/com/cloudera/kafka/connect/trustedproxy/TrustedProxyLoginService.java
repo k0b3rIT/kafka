@@ -17,17 +17,6 @@
 // Copyright (c) 2021 Cloudera, Inc. All rights reserved.
 package com.cloudera.kafka.connect.trustedproxy;
 
-import java.nio.file.Path;
-import java.security.Principal;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import javax.security.auth.Subject;
-import javax.servlet.ServletRequest;
-import javax.servlet.http.HttpServletRequest;
-
 import org.eclipse.jetty.security.ConfigurableSpnegoLoginService;
 import org.eclipse.jetty.security.IdentityService;
 import org.eclipse.jetty.security.LoginService;
@@ -39,6 +28,17 @@ import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.file.Path;
+import java.security.Principal;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import javax.security.auth.Subject;
+import javax.servlet.ServletRequest;
+import javax.servlet.http.HttpServletRequest;
 
 public class TrustedProxyLoginService extends ContainerLifeCycle implements LoginService {
 

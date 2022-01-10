@@ -17,19 +17,21 @@
 // Copyright (c) 2021 Cloudera, Inc. All rights reserved.
 package com.cloudera.kafka.connect.rest.authorization.extension.permissions;
 
+import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
+
 import com.cloudera.kafka.connect.authorization.AuthorizableAction;
 import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
 import com.cloudera.kafka.connect.authorization.Operation;
 import com.cloudera.kafka.connect.authorization.Resource;
-import com.cloudera.kafka.connect.rest.authorization.extension.TestRestServer;
+import com.cloudera.kafka.connect.common.TestConnectRestServer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +66,7 @@ class ConnectorPermissionsResourceIntegrationTest {
     ));
 
     private ConnectClusterStateImpl clusterState;
-    private TestRestServer restServer;
+    private TestConnectRestServer restServer;
     private ConnectAuthorizer authorizer;
 
     @BeforeEach
@@ -73,7 +75,8 @@ class ConnectorPermissionsResourceIntegrationTest {
         clusterState = mock(ConnectClusterStateImpl.class);
         ConnectorPermissionsService service = new ConnectorPermissionsService(authorizer);
         ConnectorPermissionsResource resource = new ConnectorPermissionsResource(clusterState, service);
-        restServer = new TestRestServer();
+        restServer = new TestConnectRestServer();
+        restServer.start();
         restServer.initializeResources(Collections.singletonList(resource));
     }
 

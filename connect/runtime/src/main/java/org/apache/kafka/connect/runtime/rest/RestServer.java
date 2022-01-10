@@ -16,9 +16,6 @@
  */
 package org.apache.kafka.connect.runtime.rest;
 
-import com.cloudera.kafka.connect.trustedproxy.SpnegoConfig;
-import com.cloudera.kafka.connect.trustedproxy.TrustedProxyProvider;
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -31,6 +28,8 @@ import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
 import org.apache.kafka.connect.runtime.rest.errors.ConnectExceptionMapper;
 import org.apache.kafka.connect.runtime.rest.util.SSLUtils;
 
+import com.cloudera.kafka.connect.trustedproxy.SpnegoConfig;
+import com.cloudera.kafka.connect.trustedproxy.TrustedProxyProvider;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
 import org.eclipse.jetty.security.ConstraintMapping;

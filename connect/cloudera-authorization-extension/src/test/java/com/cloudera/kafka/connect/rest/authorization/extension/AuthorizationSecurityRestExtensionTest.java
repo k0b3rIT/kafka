@@ -18,6 +18,20 @@
 
 package com.cloudera.kafka.connect.rest.authorization.extension;
 
+import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.common.utils.AppInfoParser;
+import org.apache.kafka.connect.health.ConnectClusterState;
+import org.apache.kafka.connect.rest.ConnectRestExtensionContext;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.ws.rs.core.Configurable;
+
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.isA;
 import static org.easymock.EasyMock.mock;
@@ -27,19 +41,6 @@ import static org.easymock.EasyMock.verify;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.ws.rs.core.Configurable;
-
-import org.apache.kafka.common.config.ConfigException;
-import org.apache.kafka.common.utils.AppInfoParser;
-import org.apache.kafka.connect.health.ConnectClusterState;
-import org.apache.kafka.connect.rest.ConnectRestExtensionContext;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 public class AuthorizationSecurityRestExtensionTest {
 

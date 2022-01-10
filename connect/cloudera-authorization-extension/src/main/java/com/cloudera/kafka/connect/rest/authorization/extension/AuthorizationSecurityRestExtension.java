@@ -18,11 +18,12 @@
 
 package com.cloudera.kafka.connect.rest.authorization.extension;
 
-import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
-
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.connect.rest.ConnectRestExtension;
 import org.apache.kafka.connect.rest.ConnectRestExtensionContext;
+
+import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

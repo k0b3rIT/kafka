@@ -17,16 +17,16 @@
 // Copyright (c) 2021 Cloudera, Inc. All rights reserved.
 package com.cloudera.kafka.connect.trustedproxy;
 
-import java.security.Principal;
-
-import javax.security.auth.Subject;
-import javax.servlet.http.HttpServletRequest;
-
 import org.eclipse.jetty.security.SpnegoUserIdentity;
 import org.eclipse.jetty.security.SpnegoUserPrincipal;
 import org.eclipse.jetty.security.authentication.AuthorizationService;
 import org.eclipse.jetty.server.UserIdentity;
 import org.eclipse.jetty.util.security.Credential;
+
+import java.security.Principal;
+
+import javax.security.auth.Subject;
+import javax.servlet.http.HttpServletRequest;
 
 
 public class TrustedProxyAuthorizationService implements AuthorizationService {

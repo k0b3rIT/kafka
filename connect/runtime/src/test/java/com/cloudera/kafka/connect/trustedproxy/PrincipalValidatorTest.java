@@ -18,7 +18,7 @@
 package com.cloudera.kafka.connect.trustedproxy;
 
 import org.apache.kafka.common.config.ConfigException;
-import org.junit.jupiter.api.Assertions;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.AbstractMap;

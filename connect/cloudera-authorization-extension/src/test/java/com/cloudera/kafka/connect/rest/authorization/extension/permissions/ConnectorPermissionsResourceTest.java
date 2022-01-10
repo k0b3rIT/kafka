@@ -17,11 +17,13 @@
 
 package com.cloudera.kafka.connect.rest.authorization.extension.permissions;
 
+import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
+
 import com.cloudera.kafka.connect.authorization.AuthorizableAction;
 import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
 import com.cloudera.kafka.connect.authorization.Operation;
 import com.cloudera.kafka.connect.authorization.Resource;
-import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
+
 import org.easymock.EasyMock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,14 +33,15 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.SecurityContext;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
+
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import static java.util.Collections.emptySet;
 import static org.easymock.EasyMock.anyObject;

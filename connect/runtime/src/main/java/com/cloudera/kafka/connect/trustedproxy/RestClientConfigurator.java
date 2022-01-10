@@ -18,6 +18,7 @@
 package com.cloudera.kafka.connect.trustedproxy;
 
 import org.apache.kafka.common.config.AbstractConfig;
+
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.util.SPNEGOAuthentication;
 import org.slf4j.Logger;

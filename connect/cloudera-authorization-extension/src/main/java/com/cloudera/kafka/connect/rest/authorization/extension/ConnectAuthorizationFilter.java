@@ -18,31 +18,21 @@
 
 package com.cloudera.kafka.connect.rest.authorization.extension;
 
+import org.apache.kafka.connect.health.ConnectClusterState;
+
 import com.cloudera.kafka.connect.authorization.AuthorizableAction;
 import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
 import com.cloudera.kafka.connect.authorization.Operation;
 import com.cloudera.kafka.connect.authorization.Resource;
 import com.cloudera.kafka.connect.authorization.ResourceType;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.cloudera.kafka.connect.common.ConnectRestFilterUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.kafka.connect.health.ConnectClusterState;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Priority;
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.Priorities;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.container.ContainerResponseFilter;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
@@ -58,6 +48,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import javax.annotation.Priority;
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.Priorities;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 
 import static com.cloudera.kafka.connect.authorization.Resource.clusterResource;
 import static com.cloudera.kafka.connect.authorization.Resource.connectorResource;
@@ -138,7 +139,7 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
     }
 
     private static Response errorResponse(Status status, String message) {
-        return Response.status(status).entity(new ErrorMessage(status.getStatusCode(), message)).build();
+        return Response.status(status).entity(new ConnectRestFilterUtils.ErrorMessage(status.getStatusCode(), message)).build();
     }
 
     private static Response errorResponse(Status status) {
@@ -394,7 +395,7 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
             try {
                 byte[] content;
                 try (InputStream inputStream = request.getEntityStream()) {
-                    content = readStream(inputStream);
+                    content = ConnectRestFilterUtils.inputStreamToByteArray(inputStream);
                     if (content == null) {
                         LOG.error("POST connector creation request with invalid body.");
                         return null;
@@ -408,20 +409,6 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
                 return name == null || !name.isTextual() ? null : name.asText().trim();
             } catch (IOException e) {
                 LOG.error("POST connector creation request with invalid body.");
-                return null;
-            }
-        }
-
-        private byte[] readStream(InputStream inputStream) {
-            byte[] buffer = new byte[1024];
-            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                int readLen;
-                while ((readLen = inputStream.read(buffer)) != -1) {
-                    bos.write(buffer, 0, readLen);
-                }
-                return bos.toByteArray();
-            } catch (IOException e) {
-                LOG.error("Error reading request body", e);
                 return null;
             }
         }
@@ -568,46 +555,6 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
                     .filter(action -> Operation.VIEW.equals(action.getOperation()))
                     .map(action -> action.getResource().getResourceName())
                     .collect(Collectors.toSet());
-        }
-    }
-
-    /**
-     * Same structure as org.apache.kafka.connect.runtime.rest.entities.ErrorMessage.
-     * org.apache.kafka.connect.runtime.rest.errors.ConnectExceptionMapper produces error responses using this
-     * structure, the filter should also use it in order for Connect Workers to be able to deserialize responses.
-     */
-    private static class ErrorMessage {
-        private final int errorCode;
-        private final String message;
-
-        @JsonCreator
-        public ErrorMessage(@JsonProperty("error_code") int errorCode, @JsonProperty("message") String message) {
-            this.errorCode = errorCode;
-            this.message = message;
-        }
-
-        @JsonProperty("error_code")
-        public int errorCode() {
-            return errorCode;
-        }
-
-        @JsonProperty
-        public String message() {
-            return message;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ErrorMessage that = (ErrorMessage) o;
-            return Objects.equals(errorCode, that.errorCode) &&
-                    Objects.equals(message, that.message);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(errorCode, message);
         }
     }
 

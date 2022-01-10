@@ -17,13 +17,13 @@
 // Copyright (c) 2021 Cloudera, Inc. All rights reserved.
 package com.cloudera.kafka.connect.trustedproxy;
 
-import java.nio.file.Paths;
-import java.util.List;
-
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
 import org.eclipse.jetty.security.authentication.ConfigurableSpnegoAuthenticator;
 import org.eclipse.jetty.util.security.Constraint;
+
+import java.nio.file.Paths;
+import java.util.List;
 
 public class TrustedProxyProvider {
 

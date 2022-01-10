@@ -18,12 +18,13 @@
 
 package com.cloudera.kafka.connect.rest.authorization.extension.permissions;
 
-import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
-import com.cloudera.kafka.connect.rest.authorization.extension.ConnectAuthorizerInstance;
-import com.cloudera.kafka.connect.rest.authorization.extension.ConnectSecurityConfig;
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.connect.rest.ConnectRestExtension;
 import org.apache.kafka.connect.rest.ConnectRestExtensionContext;
+
+import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
+import com.cloudera.kafka.connect.rest.authorization.extension.ConnectAuthorizerInstance;
+import com.cloudera.kafka.connect.rest.authorization.extension.ConnectSecurityConfig;
 
 import java.io.IOException;
 import java.util.Map;

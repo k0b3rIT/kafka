@@ -18,11 +18,13 @@
 
 package com.cloudera.kafka.connect.rest.authorization.extension;
 
+import org.apache.kafka.connect.health.ConnectClusterState;
+
 import com.cloudera.kafka.connect.authorization.AuthorizableAction;
 import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
 import com.cloudera.kafka.connect.authorization.Operation;
 import com.cloudera.kafka.connect.authorization.Resource;
-import org.apache.kafka.connect.health.ConnectClusterState;
+
 import org.easymock.EasyMock;
 import org.easymock.IArgumentMatcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,15 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
-import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
@@ -50,6 +43,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.UriInfo;
 
 import static com.cloudera.kafka.connect.authorization.Resource.clusterResource;
 import static com.cloudera.kafka.connect.authorization.Resource.connectorResource;

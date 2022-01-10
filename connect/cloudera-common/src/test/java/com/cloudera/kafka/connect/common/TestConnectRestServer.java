@@ -14,20 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Copyright (c) 2021 Cloudera, Inc. All rights reserved.
-
-package com.cloudera.kafka.connect.rest.authorization.extension;
-
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
-
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+// Copyright (c) 2022 Cloudera, Inc. All rights reserved.
+package com.cloudera.kafka.connect.common;
 
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.runtime.rest.RestServer;
 import org.apache.kafka.connect.runtime.rest.errors.ConnectExceptionMapper;
+
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+
 import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
@@ -42,18 +37,22 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
 import org.glassfish.jersey.servlet.ServletContainer;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Mock implementation of RestServer interface for testing purpose.
  */
-public class TestRestServer {
+public class TestConnectRestServer {
 
     private static final long GRACEFUL_SHUTDOWN_TIMEOUT_MS = 60 * 1000;
-    public static final long REQUEST_TIMEOUT_MS = 90 * 1000;
 
     private Server jettyServer;
     private ContextHandlerCollection handlers;
 
-    public TestRestServer() {
+    public TestConnectRestServer() {
         jettyServer = new Server(0);
         handlers = new ContextHandlerCollection();
 
@@ -62,7 +61,9 @@ public class TestRestServer {
         jettyServer.setHandler(statsHandler);
         jettyServer.setStopTimeout(GRACEFUL_SHUTDOWN_TIMEOUT_MS);
         jettyServer.setStopAtShutdown(true);
+    }
 
+    public void start() {
         try {
             jettyServer.start();
         } catch (Exception e) {
@@ -108,9 +109,9 @@ public class TestRestServer {
         }
     }
 
-    public StringBuilder serverBaseUrl() throws MalformedURLException {
+    public String serverBaseUrl() throws MalformedURLException {
         URL serverUrl = jettyServer.getURI().toURL();
-        return new StringBuilder("http://" + serverUrl.getHost() + ':' + serverUrl.getPort());
+        return "http://" + serverUrl.getHost() + ':' + serverUrl.getPort();
     }
 
     public void stop() {

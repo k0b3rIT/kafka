@@ -84,6 +84,7 @@ versions += [
   apacheda: "1.0.2",
   apacheds: "2.0.0-M24",
   argparse4j: "0.7.0",
+  awaitility: "4.1.1",
   bcpkix: project.hasProperty('bcpkixVersion') ? project.bcpkixVersion : "1.75",
   caffeine: "2.9.3", // 3.x supports JDK 11 and above
   // when updating checkstyle, check whether the exclusion of
@@ -189,6 +190,7 @@ libs += [
   apachedsJdbmPartition: "org.apache.directory.server:apacheds-jdbm-partition:$versions.apacheds",
   apachedsTestFramework: "org.apache.directory.server:apacheds-test-framework:$versions.apacheds",
   argparse4j: "net.sourceforge.argparse4j:argparse4j:$versions.argparse4j",
+  awaitility: "org.awaitility:awaitility:$versions.awaitility",
   bcpkix: "org.bouncycastle:bcpkix-jdk18on:$versions.bcpkix",
   caffeine: "com.github.ben-manes.caffeine:caffeine:$versions.caffeine",
   commonsCli: "commons-cli:commons-cli:$versions.commonsCli",

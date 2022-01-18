@@ -1017,11 +1017,13 @@ project(':core') {
     // ZooKeeperMain depends on commons-cli but declares the dependency as `provided`
     implementation libs.commonsCli
 
-    compileOnly libs.reload4j
-
-    runtimeOnly libs.slf4jReload4j
-    runtimeOnly libs.reload4j
-    runtimeOnly (libs.logredactor) {
+    // The log4j bridge is needed for the Log4jController so that it keeps using the old API (but the new implementation).
+    // We can't migrate that because then we'd need to migrate all the tests too so this is a shortcut to have log4j2
+    // on the production classpath but still run tests with log4j 1.2.
+    compileOnly libs.log4j1_2Api
+    compileOnly libs.log4j2Core
+    compileOnly libs.slf4jlog4j2
+    compileOnly(libs.logredactor) {
       exclude group: 'org.apache.logging.log4j'
       exclude group: 'log4j', module: 'log4j'
     }
@@ -1051,6 +1053,7 @@ project(':core') {
     testImplementation libs.apachedsJdbmPartition
     testImplementation libs.junitJupiter
     testImplementation libs.slf4jReload4j
+    testImplementation libs.reload4j
     testImplementation libs.caffeine
 
     testRuntimeOnly libs.junitPlatformLanucher
@@ -1079,6 +1082,10 @@ project(':core') {
     // To prevent a UniqueResourceException due the same resource existing in both
     // org.apache.directory.api/api-all and org.apache.directory.api/api-ldap-schema-data
     testImplementation.exclude module: 'api-ldap-schema-data'
+    // Having log4j2 on the runtimeOnly configuration causes them to be included in testRuntime. This is undesired as
+    // some tests capture log output which is tightly coupled to log4j 1.2's behavior, therefore fails under a different
+    // implementation. We do not wanted to migrate tests too so this is a shortcut for now.
+    testRuntimeClasspath.exclude group: 'org.apache.logging.log4j'
   }
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
@@ -1197,6 +1204,11 @@ project(':core') {
     from "$rootDir/LICENSE-binary" rename {String filename -> filename.replace("-binary", "")}
     from "$rootDir/NOTICE-binary" rename {String filename -> filename.replace("-binary", "")}
     from(configurations.runtimeClasspath) { into("libs/") }
+    from(configurations.compileClasspath) {
+      include("logredactor*")
+      include("log4j-*")
+      into("libs/")
+    }
     from(configurations.archives.artifacts.files) { into("libs/") }
     from(project.siteDocsTar) { into("site-docs/") }
     from(project(':tools').jar) { into("libs/") }
@@ -1319,7 +1331,7 @@ project(':metadata') {
     implementation libs.jacksonDatabind
     implementation libs.jacksonJDK8Datatypes
     implementation libs.metrics
-    compileOnly libs.reload4j
+
     testImplementation libs.junitJupiter
     testImplementation libs.jqwik
     testImplementation libs.hamcrest
@@ -2234,6 +2246,7 @@ project(':tools') {
     }
     testImplementation libs.reload4j
 
+    testRuntimeOnly libs.slf4jlog4j2
     testRuntimeOnly libs.junitPlatformLanucher
   }
 
@@ -2243,8 +2256,8 @@ project(':tools') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntimeClasspath) {
-      include('slf4j-log4j12*')
-      include('reload4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtimeClasspath) {
       exclude('kafka-clients*')
@@ -2641,9 +2654,6 @@ project(':streams:examples') {
     }
 
     implementation project(':streams')
-
-    implementation libs.slf4jReload4j
-    implementation libs.reload4j
 
     testImplementation project(':streams:test-utils')
     testImplementation project(':clients').sourceSets.test.output // for org.apache.kafka.test.IntegrationTest
@@ -3331,7 +3341,6 @@ project(':connect:runtime') {
     api project(':connect:transforms')
 
     implementation libs.slf4jApi
-    implementation libs.reload4j
     implementation libs.jose4j                    // for SASL/OAUTHBEARER JWT validation
     implementation libs.jacksonAnnotations
     implementation libs.jacksonJaxrsJsonProvider
@@ -3351,8 +3360,11 @@ project(':connect:runtime') {
     // or run time. So, we add it to a separate configuration, which we use later on during docs generation
     swagger libs.swaggerJaxrs2
 
+    compileOnly libs.log4j1_2Api
+
     implementation libs.prometheusServlet
     implementation libs.prometheusSimpleClient
+    testImplementation libs.log4j
 
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':core')
@@ -3476,8 +3488,8 @@ project(':connect:file') {
     testImplementation libs.junitJupiter
     testImplementation libs.mockitoCore
 
-    testRuntimeOnly libs.slf4jReload4j
-    testRuntimeOnly libs.junitPlatformLanucher
+    testRuntimeOnly libs.slf4jlog4j2
+    testRuntimeOnly libs.log4j2Core
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':connect:runtime')
     testImplementation project(':connect:runtime').sourceSets.test.output
@@ -3732,8 +3744,6 @@ project(':connect:cloudera-authorization-extension') {
     implementation libs.jerseyContainerServlet
     implementation libs.slf4jApi
     implementation libs.swaggerAnnotations
-    implementation libs.slf4jReload4j
-    implementation libs.reload4j
 
     testImplementation libs.easymock
     testImplementation libs.junitJupiter
@@ -3751,7 +3761,8 @@ project(':connect:cloudera-authorization-extension') {
     testImplementation project(':core')
     testImplementation project(':core').sourceSets.test.output
 
-    testRuntimeOnly libs.slf4jReload4j
+    testRuntimeOnly libs.slf4jlog4j2
+    testRuntimeOnly libs.log4j2Core
   }
 
   javadoc {
@@ -3789,6 +3800,7 @@ project(':connect:cloudera-secret-storage') {
     implementation libs.jerseyContainerServlet
     implementation libs.swaggerAnnotations
 
+    testImplementation libs.log4j
     testImplementation libs.junitJupiter
     testImplementation libs.easymock
     testImplementation libs.httpclient

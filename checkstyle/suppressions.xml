@@ -316,6 +316,12 @@
               files="KafkaLog4jAppender.java"/>
     <suppress checks="JavaNCSS"
               files="RequestResponseTest.java"/>
+    <suppress checks="WhitespaceAfter"
+              files="LogLog.java"/>
+    <suppress checks="WhitespaceAround"
+              files="LogLog.java"/>
+    <suppress checks="Indentation"
+              files="LogLog.java"/>
 
     <!-- metadata -->
     <suppress checks="ClassDataAbstractionCoupling"

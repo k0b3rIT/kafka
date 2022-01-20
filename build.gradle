@@ -2218,8 +2218,12 @@ project(':tools') {
     implementation libs.jacksonDataformatCsv
     implementation libs.jacksonJDK8Datatypes
     implementation libs.slf4jApi
-    implementation libs.slf4jReload4j
     implementation libs.joptSimple
+    compileOnly libs.log4j2Api
+    compileOnly libs.log4j1_2Api
+    compileOnly(libs.log4j2Core) {
+      exclude(group: 'org.apache.kafka', module: 'kafka-clients')
+    }
 
     implementation libs.jose4j                    // for SASL/OAUTHBEARER JWT validation
     implementation libs.jacksonJaxrsJsonProvider
@@ -2307,8 +2311,8 @@ project(':trogdor') {
 
   tasks.create(name: "copyDependantLibs", type: Copy) {
     from (configurations.testRuntimeClasspath) {
-      include('slf4j-log4j12*')
-      include('reload4j*jar')
+      include('log4j-slf4j-impl*')
+      include('log4j-[api|core]*jar')
     }
     from (configurations.runtimeClasspath) {
       exclude('kafka-clients*')
@@ -2350,7 +2354,7 @@ project(':shell') {
     testImplementation project(':server-common').sourceSets.test.output
     testImplementation libs.junitJupiter
 
-    testRuntimeOnly libs.slf4jReload4j
+    testRuntimeOnly libs.slf4jlog4j2
     testRuntimeOnly libs.junitPlatformLanucher
   }
 
@@ -3385,7 +3389,7 @@ project(':connect:runtime') {
     testImplementation libs.mockitoJunitJupiter
     testImplementation libs.httpclient
 
-    testRuntimeOnly libs.slf4jReload4j
+    testRuntimeOnly libs.slf4jlog4j2
     testRuntimeOnly libs.bcpkix
     testRuntimeOnly libs.junitPlatformLanucher
   }

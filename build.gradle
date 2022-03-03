@@ -871,6 +871,7 @@ def connectPkgs = [
     'connect:cloudera-common',
     'connect:cloudera-authorization-extension',
     'connect:cloudera-secret-storage',
+    'connect:cloudera-security-policies',
     'connect:file',
     'connect:json',
     'connect:runtime',
@@ -1222,6 +1223,8 @@ project(':core') {
     from(project(':connect:cloudera-authorization-extension').configurations.runtimeClasspath) { into("libs/") }
     from(project(':connect:cloudera-secret-storage').jar) { into("libs/") }
     from(project(':connect:cloudera-secret-storage').configurations.runtimeClasspath) { into("libs/") }
+    from(project(':connect:cloudera-security-policies').jar) { into("libs/") }
+    from(project(':connect:cloudera-security-policies').configurations.runtimeClasspath) { into("libs/") }
     from(project(':connect:mirror').jar) { into("libs/") }
     from(project(':connect:mirror').configurations.runtimeClasspath) { into("libs/") }
     from(project(':connect:mirror-client').jar) { into("libs/") }
@@ -3800,6 +3803,41 @@ project(':connect:cloudera-secret-storage') {
     testImplementation project(':server-common').sourceSets.test.output
     testImplementation libs.bcpkix
     testImplementation libs.awaitility
+  }
+
+  javadoc {
+    enabled = false
+  }
+
+  tasks.create(name: "copyDependantLibs", type: Copy) {
+    from (configurations.runtimeClasspath) {
+      include('slf4j-log4j12*')
+      include('log4j*jar')
+    }
+    from (configurations.runtimeClasspath) {
+      exclude('kafka-clients*')
+      exclude('connect-*')
+    }
+    into "$buildDir/dependant-libs"
+    duplicatesStrategy 'exclude'
+  }
+
+  jar {
+    dependsOn copyDependantLibs
+  }
+}
+
+project(':connect:cloudera-security-policies') {
+  archivesBaseName = "connect-cloudera-security-policies"
+
+  dependencies {
+    implementation project(':connect:api')
+    implementation project(':connect:transforms')
+    implementation project(':connect:runtime')
+    implementation libs.slf4jApi
+
+    testImplementation libs.easymock
+    testImplementation libs.junitJupiter
   }
 
   javadoc {

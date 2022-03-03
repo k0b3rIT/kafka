@@ -44,7 +44,7 @@ import javax.security.auth.login.Configuration;
  * }
  * </pre>
  */
-class JaasConfig extends Configuration {
+public class JaasConfig extends Configuration {
 
     private final String loginContextName;
     private final List<AppConfigurationEntry> configEntries;

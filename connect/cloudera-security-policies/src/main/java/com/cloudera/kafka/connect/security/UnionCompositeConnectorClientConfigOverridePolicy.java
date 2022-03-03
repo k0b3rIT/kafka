@@ -1,0 +1,74 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+// Copyright (c) 2022 Cloudera, Inc. All rights reserved.
+package com.cloudera.kafka.connect.security;
+
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.config.ConfigValue;
+import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
+import org.apache.kafka.connect.connector.policy.ConnectorClientConfigRequest;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Policy which allows enabling a union of policies.
+ * The results of the contained policies are merged into a single result.
+ */
+public class UnionCompositeConnectorClientConfigOverridePolicy implements ConnectorClientConfigOverridePolicy {
+    private List<ConnectorClientConfigOverridePolicy> policies;
+
+    public UnionCompositeConnectorClientConfigOverridePolicy() {
+
+    }
+
+    // Visible for testing
+    UnionCompositeConnectorClientConfigOverridePolicy(List<ConnectorClientConfigOverridePolicy> policies) {
+        this.policies = policies;
+    }
+
+    @Override
+    public List<ConfigValue> validate(ConnectorClientConfigRequest connectorClientConfigRequest) {
+        return policies
+                .stream()
+                .flatMap(policy -> policy.validate(connectorClientConfigRequest).stream())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (policies == null) {
+            return;
+        }
+        for (ConnectorClientConfigOverridePolicy policy : policies) {
+            policy.close();
+        }
+    }
+
+    @Override
+    public void configure(Map<String, ?> configs) {
+        UnionCompositePolicyConfig config = new UnionCompositePolicyConfig(
+                configs
+                        .entrySet()
+                        .stream()
+                        .filter(e -> !e.getKey().startsWith(ConsumerConfig.CONFIG_PROVIDERS_CONFIG))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+        );
+        policies = config.getPolicies();
+    }
+}

@@ -2355,6 +2355,7 @@ project(':shell') {
     testImplementation libs.junitJupiter
 
     testRuntimeOnly libs.slf4jlog4j2
+    testRuntimeOnly libs.log4j2Core
     testRuntimeOnly libs.junitPlatformLanucher
   }
 
@@ -3368,7 +3369,7 @@ project(':connect:runtime') {
 
     implementation libs.prometheusServlet
     implementation libs.prometheusSimpleClient
-    testImplementation libs.log4j
+    testImplementation libs.reload4j
 
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':core')
@@ -3390,6 +3391,7 @@ project(':connect:runtime') {
     testImplementation libs.httpclient
 
     testRuntimeOnly libs.slf4jlog4j2
+    testRuntimeOnly libs.log4j2Core
     testRuntimeOnly libs.bcpkix
     testRuntimeOnly libs.junitPlatformLanucher
   }
@@ -3804,7 +3806,7 @@ project(':connect:cloudera-secret-storage') {
     implementation libs.jerseyContainerServlet
     implementation libs.swaggerAnnotations
 
-    testImplementation libs.log4j
+    testImplementation libs.reload4j
     testImplementation libs.junitJupiter
     testImplementation libs.easymock
     testImplementation libs.httpclient

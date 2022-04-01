@@ -12,7 +12,7 @@ src_managed/
 project/boot/
 project/plugins/project/
 patch-process/*
-.idea
+.idea/*
 .svn
 .classpath
 /.metadata

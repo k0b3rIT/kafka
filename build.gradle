@@ -224,6 +224,7 @@ if (repo != null) {
     // And some of the files that we have checked in should also be excluded from this check
     excludes.addAll([
         '**/.git/**',
+        '**/.idea/**',
         '**/build/**',
         'CONTRIBUTING.md',
         'PULL_REQUEST_TEMPLATE.md',

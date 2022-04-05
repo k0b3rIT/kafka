@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -133,6 +134,33 @@ public class ConnectMetricsTest {
     }
 
     @Test
+    public void testMetricGroupDistinctTaskMetricNames() {
+        MetricGroup metricGroup1 = createMetricGroupWithTaskStatus(".source__target");
+        MetricGroup metricGroup2 = createMetricGroupWithTaskStatus(".target__source");
+
+        Optional<MetricName> statusMetricInstance1 = getMetricNameOfGroup(metricGroup1, "status");
+        Optional<MetricName> statusMetricInstance2 = getMetricNameOfGroup(metricGroup2, "status");
+
+        assertTrue(statusMetricInstance1.isPresent());
+        assertTrue(statusMetricInstance2.isPresent());
+        assertNotEquals(statusMetricInstance1.get(), statusMetricInstance2.get());
+    }
+
+
+    @Test
+    public void testMetricGroupDistinctConnectorMetricNames() {
+        MetricGroup metricGroup1 = createMetricGroupWithConnectorStatus(".source__target");
+        MetricGroup metricGroup2 = createMetricGroupWithConnectorStatus(".target__source");
+
+        Optional<MetricName> statusMetricInstance1 = getMetricNameOfGroup(metricGroup1, "status");
+        Optional<MetricName> statusMetricInstance2 = getMetricNameOfGroup(metricGroup2, "status");
+
+        assertTrue(statusMetricInstance1.isPresent());
+        assertTrue(statusMetricInstance2.isPresent());
+        assertNotEquals(statusMetricInstance1.get(), statusMetricInstance2.get());
+    }
+
+    @Test
     public void testRecreateWithClose() {
         final Sensor originalSensor = addToGroup(metrics, false);
         final Sensor recreatedSensor = addToGroup(metrics, true);
@@ -187,6 +215,42 @@ public class ConnectMetricsTest {
 
         return sensor;
     }
+
+    private MetricGroup createMetricGroupWithTaskStatus(String groupPostfix) {
+        Map<String, String> workerConfig = new HashMap<>(DEFAULT_WORKER_CONFIG);
+        workerConfig.put(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG, groupPostfix);
+        ConnectMetrics metrics = new ConnectMetrics("worker", new WorkerConfig(WorkerConfig.baseConfigDef(), workerConfig), new MockTime(), "cluster-1");
+
+        MetricGroup metricGroup = metrics.group(metrics.registry().taskGroupName(),
+                metrics.registry().connectorTagName(), "test-connector",
+                metrics.registry().taskTagName(), "test-task");
+        metricGroup.close();
+        metricGroup.addValueMetric(metrics.registry().taskStatus, now -> "running");
+
+        return metricGroup;
+    }
+
+    private MetricGroup createMetricGroupWithConnectorStatus(String groupPostfix) {
+        Map<String, String> workerConfig = new HashMap<>(DEFAULT_WORKER_CONFIG);
+        workerConfig.put(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG, groupPostfix);
+        ConnectMetrics metrics = new ConnectMetrics("worker", new WorkerConfig(WorkerConfig.baseConfigDef(), workerConfig), new MockTime(), "cluster-1");
+
+        MetricGroup metricGroup = metrics.group(metrics.registry().connectorGroupName(),
+                metrics.registry().connectorTagName(), "test-connector");
+        metricGroup.close();
+        metricGroup.addValueMetric(metrics.registry().connectorStatus, now -> "running");
+
+        return metricGroup;
+    }
+
+    private Optional<MetricName> getMetricNameOfGroup(MetricGroup metricGroup, String metricName) {
+        return metricGroup.metrics().metrics()
+                .keySet()
+                .stream()
+                .filter(mn -> mn.name().equals(metricName))
+                .findFirst();
+    }
+
 
     static MetricName metricName(String name) {
         return new MetricName(name, "test_group", "metrics for testing", Collections.emptyMap());

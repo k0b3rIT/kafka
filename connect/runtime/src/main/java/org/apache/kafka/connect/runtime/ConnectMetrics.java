@@ -59,7 +59,7 @@ public class ConnectMetrics {
     private final Time time;
     private final String workerId;
     private final ConcurrentMap<MetricGroupId, MetricGroup> groupsByName = new ConcurrentHashMap<>();
-    private final ConnectMetricsRegistry registry = new ConnectMetricsRegistry();
+    private final ConnectMetricsRegistry registry;
 
     /**
      * Create an instance.
@@ -72,6 +72,7 @@ public class ConnectMetrics {
     public ConnectMetrics(String workerId, WorkerConfig config, Time time, String clusterId) {
         this.workerId = workerId;
         this.time = time;
+        registry = new ConnectMetricsRegistry(config.getString(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG));
 
         int numSamples = config.getInt(CommonClientConfigs.METRICS_NUM_SAMPLES_CONFIG);
         long sampleWindowMs = config.getLong(CommonClientConfigs.METRICS_SAMPLE_WINDOW_MS_CONFIG);

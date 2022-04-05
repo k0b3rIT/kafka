@@ -223,6 +223,8 @@ public class MirrorMakerConfig extends AbstractConfig {
         props.putIfAbsent(VALUE_CONVERTER_CLASS_CONFIG, BYTE_ARRAY_CONVERTER_CLASS); 
         props.putIfAbsent(HEADER_CONVERTER_CLASS_CONFIG, BYTE_ARRAY_CONVERTER_CLASS);
 
+        props.put(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG, "." + sourceAndTarget.source() + "__" + sourceAndTarget.target());
+
         return props;
     }
 

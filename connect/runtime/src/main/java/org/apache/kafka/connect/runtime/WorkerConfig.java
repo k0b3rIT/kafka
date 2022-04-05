@@ -184,6 +184,10 @@ public class WorkerConfig extends AbstractConfig {
             + "to create topics automatically.";
     protected static final boolean TOPIC_CREATION_ENABLE_DEFAULT = true;
 
+    public static final String METRIC_GROUPNAME_POSTFIX_CONFIG = "metric.groupname.postfix";
+    protected static final String METRIC_GROUPNAME_POSTFIX_DOC = "The group name postfix for all the connector metric group names";
+    protected static final String METRIC_GROUPNAME_POSTFIX_DEFAULT = "";
+
     /**
      * Get a basic ConfigDef for a WorkerConfig. This includes all the common settings. Subclasses can use this to
      * bootstrap their own ConfigDef.
@@ -251,6 +255,8 @@ public class WorkerConfig extends AbstractConfig {
                         Importance.MEDIUM, CONNECTOR_CLIENT_POLICY_CLASS_DOC)
                 .define(TOPIC_CREATION_ENABLE_CONFIG, Type.BOOLEAN, TOPIC_CREATION_ENABLE_DEFAULT, Importance.LOW,
                         TOPIC_CREATION_ENABLE_DOC)
+                .define(METRIC_GROUPNAME_POSTFIX_CONFIG, Type.STRING, METRIC_GROUPNAME_POSTFIX_DEFAULT, Importance.LOW,
+                    METRIC_GROUPNAME_POSTFIX_DOC)
                 // security support
                 .withClientSslSupport();
         addTopicTrackingConfig(result);
@@ -439,6 +445,10 @@ public class WorkerConfig extends AbstractConfig {
         super(definition, props, Utils.castToStringObjectMap(props), true);
         logInternalConverterRemovalWarnings(props);
         logPluginPathConfigProviderWarning(props);
+    }
+
+    public WorkerConfig(Map<String, String> props) {
+        this(baseConfigDef(), props);
     }
 
     @Override

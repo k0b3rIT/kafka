@@ -39,6 +39,8 @@ public class ConnectMetricsRegistry {
     public static final String TASK_ERROR_HANDLING_GROUP_NAME = "task-error-metrics";
 
     private final List<MetricNameTemplate> allTemplates = new ArrayList<>();
+    private final String metricGroupNamePostfix;
+
     public final MetricNameTemplate connectorStatus;
     public final MetricNameTemplate connectorType;
     public final MetricNameTemplate connectorClass;
@@ -119,10 +121,15 @@ public class ConnectMetricsRegistry {
     public Map<MetricNameTemplate, TaskStatus.State> connectorStatusMetrics;
 
     public ConnectMetricsRegistry() {
-        this(new LinkedHashSet<>());
+        this(new LinkedHashSet<>(), "");
     }
 
-    public ConnectMetricsRegistry(Set<String> tags) {
+    public ConnectMetricsRegistry(String metricGroupNamePostfix) {
+        this(new LinkedHashSet<>(), metricGroupNamePostfix);
+    }
+
+    public ConnectMetricsRegistry(Set<String> tags, String metricGroupNamePostfix) {
+        this.metricGroupNamePostfix = metricGroupNamePostfix;
         /* Connector level */
         Set<String> connectorTags = new LinkedHashSet<>(tags);
         connectorTags.add(CONNECTOR_TAG_NAME);
@@ -332,14 +339,7 @@ public class ConnectMetricsRegistry {
             WORKER_GROUP_NAME,
             "The number of restarting tasks of the connector on the worker.", workerConnectorTags);
 
-        connectorStatusMetrics = new HashMap<>();
-        connectorStatusMetrics.put(connectorRunningTaskCount, TaskStatus.State.RUNNING);
-        connectorStatusMetrics.put(connectorPausedTaskCount, TaskStatus.State.PAUSED);
-        connectorStatusMetrics.put(connectorFailedTaskCount, TaskStatus.State.FAILED);
-        connectorStatusMetrics.put(connectorUnassignedTaskCount, TaskStatus.State.UNASSIGNED);
-        connectorStatusMetrics.put(connectorDestroyedTaskCount, TaskStatus.State.DESTROYED);
-        connectorStatusMetrics.put(connectorRestartingTaskCount, TaskStatus.State.RESTARTING);
-        connectorStatusMetrics = Collections.unmodifiableMap(connectorStatusMetrics);
+        connectorStatusMetrics = collectConnectorStatusMetrics();
 
         /* Worker rebalance level */
         Set<String> rebalanceTags = new LinkedHashSet<>(tags);
@@ -381,10 +381,30 @@ public class ConnectMetricsRegistry {
                 "The epoch timestamp when this task last encountered an error.", taskErrorHandlingTags);
     }
 
+    private Map<MetricNameTemplate, AbstractStatus.State> collectConnectorStatusMetrics() {
+        Map<MetricNameTemplate, AbstractStatus.State> connectorStatusMetrics = new HashMap<>();
+        connectorStatusMetrics.put(connectorRunningTaskCount, TaskStatus.State.RUNNING);
+        connectorStatusMetrics.put(connectorPausedTaskCount, TaskStatus.State.PAUSED);
+        connectorStatusMetrics.put(connectorFailedTaskCount, TaskStatus.State.FAILED);
+        connectorStatusMetrics.put(connectorUnassignedTaskCount, TaskStatus.State.UNASSIGNED);
+        connectorStatusMetrics.put(connectorDestroyedTaskCount, TaskStatus.State.DESTROYED);
+        connectorStatusMetrics.put(connectorRestartingTaskCount, TaskStatus.State.RESTARTING);
+        return Collections.unmodifiableMap(connectorStatusMetrics);
+    }
+
     private MetricNameTemplate createTemplate(String name, String group, String doc, Set<String> tags) {
-        MetricNameTemplate template = new MetricNameTemplate(name, group, doc, tags);
+        MetricNameTemplate template = new MetricNameTemplate(name, postfixedGroupName(group), doc, tags);
         allTemplates.add(template);
         return template;
+    }
+
+    /**
+     * We postfix the group name with a configured postfix, which represtents the replication flow
+     * in case of {@link org.apache.kafka.connect.mirror.MirrorMaker}.
+     * By default, the postfix is empty.
+     */
+    private String postfixedGroupName(String group) {
+        return group + metricGroupNamePostfix;
     }
 
     public List<MetricNameTemplate> getAllTemplates() {
@@ -400,30 +420,30 @@ public class ConnectMetricsRegistry {
     }
 
     public String connectorGroupName() {
-        return CONNECTOR_GROUP_NAME;
+        return postfixedGroupName(CONNECTOR_GROUP_NAME);
     }
 
     public String taskGroupName() {
-        return TASK_GROUP_NAME;
+        return postfixedGroupName(TASK_GROUP_NAME);
     }
 
     public String sinkTaskGroupName() {
-        return SINK_TASK_GROUP_NAME;
+        return postfixedGroupName(SINK_TASK_GROUP_NAME);
     }
 
     public String sourceTaskGroupName() {
-        return SOURCE_TASK_GROUP_NAME;
+        return postfixedGroupName(SOURCE_TASK_GROUP_NAME);
     }
 
     public String workerGroupName() {
-        return WORKER_GROUP_NAME;
+        return postfixedGroupName(WORKER_GROUP_NAME);
     }
 
     public String workerRebalanceGroupName() {
-        return WORKER_REBALANCE_GROUP_NAME;
+        return postfixedGroupName(WORKER_REBALANCE_GROUP_NAME);
     }
 
     public String taskErrorHandlingGroupName() {
-        return TASK_ERROR_HANDLING_GROUP_NAME;
+        return postfixedGroupName(TASK_ERROR_HANDLING_GROUP_NAME);
     }
 }

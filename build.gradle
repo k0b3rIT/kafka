@@ -3360,16 +3360,18 @@ project(':connect:runtime') {
     implementation libs.reflections
     implementation libs.mavenArtifact
     implementation libs.swaggerAnnotations
+    implementation libs.log4j1_2Api
 
     // We use this library to generate OpenAPI docs for the REST API, but we don't want or need it at compile
     // or run time. So, we add it to a separate configuration, which we use later on during docs generation
     swagger libs.swaggerJaxrs2
 
-    compileOnly libs.log4j1_2Api
-
     implementation libs.prometheusServlet
     implementation libs.prometheusSimpleClient
-    testImplementation libs.reload4j
+
+    configurations.testRuntimeClasspath {
+      exclude group: "org.apache.logging.log4j"
+    }
 
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':core')
@@ -3389,6 +3391,7 @@ project(':connect:runtime') {
     testImplementation libs.hamcrest
     testImplementation libs.mockitoJunitJupiter
     testImplementation libs.httpclient
+    testImplementation libs.slf4jlog4j2
 
     testRuntimeOnly libs.slf4jlog4j2
     testRuntimeOnly libs.log4j2Core

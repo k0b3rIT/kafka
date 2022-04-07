@@ -227,6 +227,7 @@ public class LoggersTest {
                     )));
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         Logger lookupLogger(String logger) {
             return currentLoggers.computeIfAbsent(logger, l -> new Logger(logger) { });
@@ -243,6 +244,7 @@ public class LoggersTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Logger logger(String name) {
         return new Logger(name) { };
     }

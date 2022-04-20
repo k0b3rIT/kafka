@@ -225,6 +225,9 @@ public class MirrorMakerConfig extends AbstractConfig {
 
         props.put(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG, "." + sourceAndTarget.source() + "__" + sourceAndTarget.target());
 
+        props.putIfAbsent(MirrorConnectorConfig.SOURCE_CLUSTER_ALIAS, sourceAndTarget.source());
+        props.putIfAbsent(MirrorConnectorConfig.TARGET_CLUSTER_ALIAS, sourceAndTarget.target());
+
         return props;
     }
 

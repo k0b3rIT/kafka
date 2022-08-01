@@ -60,7 +60,7 @@ public class MirrorSourceMetricsTest {
         metrics.addReporter(reporter);
 
         metrics.countRecord(SOURCE_TP);
-        assertEquals(13, reporter.metrics.size());
+        assertEquals(17, reporter.metrics.size());
         Map<String, String> tags = reporter.metrics.get(0).metricName().tags();
         assertEquals(TARGET, tags.get("target"));
         assertEquals(SOURCE_TP.topic(), tags.get("topic"));
@@ -76,7 +76,7 @@ public class MirrorSourceMetricsTest {
         metrics.addReporter(reporter);
 
         metrics.countRecord(SOURCE_TP);
-        assertEquals(13, reporter.metrics.size());
+        assertEquals(17, reporter.metrics.size());
         Map<String, String> tags = reporter.metrics.get(0).metricName().tags();
         assertEquals(SOURCE, tags.get("source"));
         assertEquals(TARGET, tags.get("target"));

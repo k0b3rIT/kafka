@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -51,6 +52,10 @@ class MirrorSourceMetrics implements AutoCloseable {
     private final MetricNameTemplate replicationLatencyMax;
     private final MetricNameTemplate replicationLatencyMin;
     private final MetricNameTemplate replicationLatencyAvg;
+    private final MetricNameTemplate replicationRecordsLag;
+    private final MetricNameTemplate replicationRecordsLagMax;
+    private final MetricNameTemplate replicationRecordsLagMin;
+    private final MetricNameTemplate replicationRecordsLagAvg;
 
     private final Metrics metrics;
     private final Map<TopicPartition, PartitionMetrics> partitionMetrics;
@@ -105,16 +110,30 @@ class MirrorSourceMetrics implements AutoCloseable {
                 "replication-latency-ms-avg", SOURCE_CONNECTOR_GROUP,
                 "Average time it takes records to replicate from source to target cluster.", partitionTags);
 
+        replicationRecordsLag = new MetricNameTemplate("replication-records-lag", SOURCE_CONNECTOR_GROUP,
+            "Number of records lagging behind the replication (to be replicated to target cluster).", partitionTags);
+        replicationRecordsLagMax = new MetricNameTemplate("replication-records-lag-max", SOURCE_CONNECTOR_GROUP,
+            "Max number of records lagging behind the replication (to be replicated to target cluster).", partitionTags);
+        replicationRecordsLagMin = new MetricNameTemplate("replication-records-lag-min", SOURCE_CONNECTOR_GROUP,
+            "Min number of records lagging behind the replication (to be replicated to target cluster).", partitionTags);
+        replicationRecordsLagAvg = new MetricNameTemplate("replication-records-lag-avg", SOURCE_CONNECTOR_GROUP,
+            "Average number of records lagging behind the replication (to be replicated to target cluster).", partitionTags);
+
+        boolean isReplicationRecordsLagEnabled = taskConfig.replicationRecordsLagCalcEnabled();
+
         // for side-effect
         metrics.sensor("record-count");
         metrics.sensor("byte-rate");
         metrics.sensor("record-age");
         metrics.sensor("replication-latency");
+        if (isReplicationRecordsLagEnabled) {
+            metrics.sensor(replicationRecordsLag.name());
+        }
 
         ReplicationPolicy replicationPolicy = taskConfig.replicationPolicy();
         partitionMetrics = taskConfig.taskTopicPartitions().stream()
             .map(x -> new TopicPartition(replicationPolicy.formatRemoteTopic(source, x.topic()), x.partition()))
-            .collect(Collectors.toMap(x -> x, PartitionMetrics::new));
+            .collect(Collectors.toMap(x -> x, x -> new PartitionMetrics(x, isReplicationRecordsLagEnabled)));
 
     }
 
@@ -139,6 +158,11 @@ class MirrorSourceMetrics implements AutoCloseable {
         partitionMetrics.get(topicPartition).byteSensor.record((double) bytes);
     }
 
+    void replicationRecordsLag(TopicPartition topicPartition, long numRecords) {
+        partitionMetrics.get(topicPartition).replicationRecordsLagSensorOptional
+                .ifPresent(sensor -> sensor.record((double) numRecords));
+    }
+
     void addReporter(MetricsReporter reporter) {
         metrics.addReporter(reporter);
     }
@@ -148,13 +172,14 @@ class MirrorSourceMetrics implements AutoCloseable {
         private final Sensor byteSensor;
         private final Sensor recordAgeSensor;
         private final Sensor replicationLatencySensor;
+        private final Optional<Sensor> replicationRecordsLagSensorOptional;
 
-        PartitionMetrics(TopicPartition topicPartition) {
+        PartitionMetrics(TopicPartition topicPartition, boolean isReplicationRecordsLagEnabled) {
             String prefix = topicPartition.topic() + "-" + topicPartition.partition() + "-";
 
             Map<String, String> tags = new LinkedHashMap<>();
             if (addSourceAlias) tags.put("source", source);
-            tags.put("target", target); 
+            tags.put("target", target);
             tags.put("topic", topicPartition.topic());
             tags.put("partition", Integer.toString(topicPartition.partition()));
 
@@ -175,6 +200,18 @@ class MirrorSourceMetrics implements AutoCloseable {
             replicationLatencySensor.add(metrics.metricInstance(replicationLatencyMax, tags), new Max());
             replicationLatencySensor.add(metrics.metricInstance(replicationLatencyMin, tags), new Min());
             replicationLatencySensor.add(metrics.metricInstance(replicationLatencyAvg, tags), new Avg());
+
+            if (isReplicationRecordsLagEnabled) {
+                Sensor replicationRecordsLagSensor = metrics.sensor(prefix + replicationRecordsLag.name());
+                replicationRecordsLagSensor.add(metrics.metricInstance(replicationRecordsLag, tags), new Value());
+                replicationRecordsLagSensor.add(metrics.metricInstance(replicationRecordsLagMax, tags), new Max());
+                replicationRecordsLagSensor.add(metrics.metricInstance(replicationRecordsLagMin, tags), new Min());
+                replicationRecordsLagSensor.add(metrics.metricInstance(replicationRecordsLagAvg, tags), new Avg());
+
+                replicationRecordsLagSensorOptional = Optional.of(replicationRecordsLagSensor);
+            } else {
+                replicationRecordsLagSensorOptional = Optional.empty();
+            }
         }
     }
 }

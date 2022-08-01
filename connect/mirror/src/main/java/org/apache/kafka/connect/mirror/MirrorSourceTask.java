@@ -24,6 +24,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.header.ConnectHeaders;
@@ -35,10 +36,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
@@ -59,13 +63,22 @@ public class MirrorSourceTask extends SourceTask {
     private Semaphore consumerAccess;
     private OffsetSyncWriter offsetSyncWriter;
     private boolean copySourceOffsetIntoHeader;
+    private ConcurrentMap<TopicPartition, Long> lastReplicatedOffsets;
+    private Duration replicationRecordsLagEndOffsetTimeout;
+    private long replicationRecordsLagCalcPeriodMs;
+    private boolean replicationRecordsLagCalcEnabled;
+    private Instant lastRecordsLagEndOffsetQueryTime;
+    private final Time currentTime;
 
-    public MirrorSourceTask() {}
+    public MirrorSourceTask() {
+        this.currentTime = Time.SYSTEM;
+    }
 
     // for testing
     MirrorSourceTask(KafkaConsumer<byte[], byte[]> consumer, MirrorSourceMetrics metrics, String sourceClusterAlias,
                      ReplicationPolicy replicationPolicy,
-                     OffsetSyncWriter offsetSyncWriter, boolean copySourceOffsetIntoHeader) {
+                     OffsetSyncWriter offsetSyncWriter, boolean copySourceOffsetIntoHeader, ConcurrentMap<TopicPartition, Long> lastReplicatedOffsets,
+                     long replicationRecordsLagCalcPeriodMs, Time currentTime) {
         this.consumer = consumer;
         this.metrics = metrics;
         this.sourceClusterAlias = sourceClusterAlias;
@@ -73,12 +86,20 @@ public class MirrorSourceTask extends SourceTask {
         consumerAccess = new Semaphore(1);
         this.offsetSyncWriter = offsetSyncWriter;
         this.copySourceOffsetIntoHeader = copySourceOffsetIntoHeader;
+        this.lastReplicatedOffsets = lastReplicatedOffsets;
+        this.replicationRecordsLagEndOffsetTimeout = Duration.ofMillis(60000L);
+        this.replicationRecordsLagCalcPeriodMs = replicationRecordsLagCalcPeriodMs;
+        this.replicationRecordsLagCalcEnabled = replicationRecordsLagCalcPeriodMs != -1;
+        this.currentTime = currentTime;
     }
 
     @Override
     public void start(Map<String, String> props) {
         MirrorSourceTaskConfig config = new MirrorSourceTaskConfig(props);
         consumerAccess = new Semaphore(1);  // let one thread at a time access the consumer
+        replicationRecordsLagEndOffsetTimeout = config.replicationRecordsLagEndOffsetTimeout();
+        replicationRecordsLagCalcPeriodMs = config.replicationRecordsLagCalcPeriodMs();
+        replicationRecordsLagCalcEnabled = config.replicationRecordsLagCalcEnabled();
         sourceClusterAlias = config.sourceClusterAlias();
         metrics = config.metrics();
         pollTimeout = config.consumerPollTimeout();
@@ -90,7 +111,6 @@ public class MirrorSourceTask extends SourceTask {
         copySourceOffsetIntoHeader = config.copySourceOffsetIntoHeader();
         Set<TopicPartition> taskTopicPartitions = config.taskTopicPartitions();
         initializeConsumer(taskTopicPartitions);
-
         log.info("{} replicating {} topic-partitions {}->{}: {}.", Thread.currentThread().getName(),
             taskTopicPartitions.size(), sourceClusterAlias, config.targetClusterAlias(), taskTopicPartitions);
     }
@@ -139,6 +159,7 @@ public class MirrorSourceTask extends SourceTask {
         }
         try {
             ConsumerRecords<byte[], byte[]> records = consumer.poll(pollTimeout);
+            recordReplicationRecordsLag(consumer.assignment());
             List<SourceRecord> sourceRecords = new ArrayList<>(records.count());
             for (ConsumerRecord<byte[], byte[]> record : records) {
                 SourceRecord converted = convertRecord(record);
@@ -185,17 +206,57 @@ public class MirrorSourceTask extends SourceTask {
         long latency = System.currentTimeMillis() - record.timestamp();
         metrics.countRecord(topicPartition);
         metrics.replicationLatency(topicPartition, latency);
+        TopicPartition sourceTopicPartition = MirrorUtils.unwrapPartition(record.sourcePartition());
+        long upstreamOffset = MirrorUtils.unwrapOffset(record.sourceOffset());
+        long downstreamOffset = metadata.offset();
+        lastReplicatedOffsets.compute(sourceTopicPartition, (k, v) ->
+            (v == null || upstreamOffset > v) ? Long.valueOf(upstreamOffset) : v);
         // Queue offset syncs only when offsetWriter is available
         if (offsetSyncWriter != null) {
-            TopicPartition sourceTopicPartition = MirrorUtils.unwrapPartition(record.sourcePartition());
-            long upstreamOffset = MirrorUtils.unwrapOffset(record.sourceOffset());
-            long downstreamOffset = metadata.offset();
             offsetSyncWriter.maybeQueueOffsetSyncs(sourceTopicPartition, upstreamOffset, downstreamOffset);
             // We may be able to immediately publish an offset sync that we've queued up here
             offsetSyncWriter.firePendingOffsetSyncs();
         }
     }
- 
+
+    private void recordReplicationRecordsLag(Set<TopicPartition> consumerAssignment) {
+        if (!replicationRecordsLagCalcEnabled) {
+            return;
+        }
+
+        if (lastRecordsLagEndOffsetQueryTime != null && Duration.between(lastRecordsLagEndOffsetQueryTime, Instant.ofEpochMilli(currentTime.milliseconds()))
+                .toMillis() < replicationRecordsLagCalcPeriodMs) {
+            return;
+        }
+
+        try {
+            Map<TopicPartition, Long> logEndOffsets = consumer.endOffsets(consumerAssignment, replicationRecordsLagEndOffsetTimeout);
+            for (Map.Entry<TopicPartition, Long> partitionLogEndOffset : logEndOffsets.entrySet()) {
+                TopicPartition partition = partitionLogEndOffset.getKey();
+                String downstreamTopicName = replicationPolicy.formatRemoteTopic(sourceClusterAlias, partition.topic());
+                TopicPartition downstreamPartition = new TopicPartition(downstreamTopicName, partition.partition());
+                Long recordLag = calcReplicationRecordsLag(partitionLogEndOffset.getValue(),
+                        lastReplicatedOffsets.get(partition));
+                if (recordLag != null) {
+                    metrics.replicationRecordsLag(downstreamPartition, recordLag);
+                }
+            }
+
+            lastRecordsLagEndOffsetQueryTime = Instant.ofEpochMilli(currentTime.milliseconds());
+        } catch (Exception e) {
+            log.warn("Replication-records-lag metric cannot be calculated: ", e);
+        }
+    }
+
+    // visible for testing
+    static Long calcReplicationRecordsLag(long endOffset, Long lastReplicatedOffset) {
+        if (lastReplicatedOffset == null || lastReplicatedOffset >= endOffset) {
+            return null;
+        }
+        // endOffset points to last record + 1, to calc the lag, we need to subtract 1
+        return endOffset - 1 - lastReplicatedOffset;
+    }
+
     private Map<TopicPartition, Long> loadOffsets(Set<TopicPartition> topicPartitions) {
         return topicPartitions.stream().collect(Collectors.toMap(x -> x, this::loadOffset));
     }
@@ -209,6 +270,7 @@ public class MirrorSourceTask extends SourceTask {
     // visible for testing
     void initializeConsumer(Set<TopicPartition> taskTopicPartitions) {
         Map<TopicPartition, Long> topicPartitionOffsets = loadOffsets(taskTopicPartitions);
+        lastReplicatedOffsets = new ConcurrentHashMap<>(topicPartitionOffsets);
         consumer.assign(topicPartitionOffsets.keySet());
         log.info("Starting with {} previously uncommitted partitions.", topicPartitionOffsets.values().stream()
                 .filter(this::isUncommitted).count());
@@ -223,6 +285,7 @@ public class MirrorSourceTask extends SourceTask {
             log.trace("Seeking to offset {} for topicPartition: {}", nextOffsetToCommittedOffset, topicPartition);
             consumer.seek(topicPartition, nextOffsetToCommittedOffset);
         });
+        recordReplicationRecordsLag(topicPartitionOffsets.keySet());
     }
 
     // visible for testing 

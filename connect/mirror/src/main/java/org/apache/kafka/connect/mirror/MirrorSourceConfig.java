@@ -114,6 +114,18 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
     public static final String OFFSET_SYNCS_SOURCE_ADMIN_ROLE = OFFSET_SYNCS_CLIENT_ROLE_PREFIX + "source-admin";
     public static final String OFFSET_SYNCS_TARGET_ADMIN_ROLE = OFFSET_SYNCS_CLIENT_ROLE_PREFIX + "target-admin";
 
+    public static final String REPLICATION_RECORDS_LAG_CALC_PERIOD_MS = "replication.records.lag.calc.period.ms";
+    private static final String REPLICATION_RECORDS_LAG_CALC_PERIOD_MS_DOC =
+            "The period between refreshing replication-records-lag metric of MirrorSourceTask. 0 is the default value, so every poll request of the replication will calculate this metric.";
+    public static final long REPLICATION_RECORDS_LAG_CALC_PERIOD_MS_DEFAULT = 0L;
+    public static final String REPLICATION_RECORDS_LAG_CALC_ENABLED = "replication.records.lag.calc" + ENABLED_SUFFIX;
+    private static final String REPLICATION_RECORDS_LAG_CALC_ENABLED_DOC = "Whether to calculate replication records lag during MirrorSourceTask start and poll.";
+    public static final boolean REPLICATION_RECORDS_LAG_CALC_ENABLED_DEFAULT = true;
+    public static final String REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS = "replication.records.lag.end.offset.timeout.ms";
+    private static final String REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DOC =
+            "Specifies the timeout (in milliseconds) for end offset calls of consumers during replication records lag calculation.";
+    public static final long REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DEFAULT = 60 * 1000L;
+
     public MirrorSourceConfig(Map<String, String> props) {
         super(CONNECTOR_CONFIG_DEF, ConfigUtils.translateDeprecatedConfigs(props, new String[][]{
                 {TOPICS_EXCLUDE, TOPICS_EXCLUDE_ALIAS},
@@ -214,6 +226,18 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
 
     Duration consumerPollTimeout() {
         return Duration.ofMillis(getLong(CONSUMER_POLL_TIMEOUT_MILLIS));
+    }
+
+    long replicationRecordsLagCalcPeriodMs() {
+        return getLong(REPLICATION_RECORDS_LAG_CALC_PERIOD_MS);
+    }
+
+    boolean replicationRecordsLagCalcEnabled() {
+        return getBoolean(REPLICATION_RECORDS_LAG_CALC_ENABLED);
+    }
+
+    public Duration replicationRecordsLagEndOffsetTimeout() {
+        return Duration.ofMillis(getLong(REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS));
     }
 
     boolean addSourceAliasToMetrics() {
@@ -353,13 +377,30 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
                         ConfigDef.Type.BOOLEAN,
                         EMIT_OFFSET_SYNCS_ENABLED_DEFAULT,
                         ConfigDef.Importance.LOW,
-                        EMIT_OFFSET_SYNCS_ENABLED_DOC
-                );
+                        EMIT_OFFSET_SYNCS_ENABLED_DOC)
+                .define(
+                        REPLICATION_RECORDS_LAG_CALC_PERIOD_MS,
+                        ConfigDef.Type.LONG,
+                        REPLICATION_RECORDS_LAG_CALC_PERIOD_MS_DEFAULT,
+                        ConfigDef.Importance.LOW,
+                        REPLICATION_RECORDS_LAG_CALC_PERIOD_MS_DOC)
+                .define(
+                        REPLICATION_RECORDS_LAG_CALC_ENABLED,
+                        ConfigDef.Type.BOOLEAN,
+                        REPLICATION_RECORDS_LAG_CALC_ENABLED_DEFAULT,
+                        ConfigDef.Importance.LOW,
+                        REPLICATION_RECORDS_LAG_CALC_ENABLED_DOC)
+                .define(
+                        REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS,
+                        ConfigDef.Type.LONG,
+                        REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DEFAULT,
+                        ConfigDef.Importance.LOW,
+                        REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DOC);
     }
 
     protected static final ConfigDef CONNECTOR_CONFIG_DEF = defineSourceConfig(new ConfigDef(BASE_CONNECTOR_CONFIG_DEF));
 
-    public static void main(String[] args) {        
+    public static void main(String[] args) {
         System.out.println(defineSourceConfig(new ConfigDef()).toHtml(4, config -> "mirror_source_" + config));
     }
 }

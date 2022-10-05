@@ -1642,6 +1642,7 @@ project(':clients') {
     testImplementation libs.reload4j
     testImplementation libs.mockitoCore
     testImplementation libs.mockitoJunitJupiter // supports MockitoExtension
+    testImplementation libs.hamcrest
 
     testRuntimeOnly libs.slf4jReload4j
     testRuntimeOnly libs.jacksonDatabind

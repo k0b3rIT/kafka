@@ -3690,3 +3690,83 @@ task aggregatedJavadoc(type: Javadoc, dependsOn: compileJava) {
   includes = projectsWithJavadoc.collectMany { it.javadoc.getIncludes() }
   excludes = projectsWithJavadoc.collectMany { it.javadoc.getExcludes() }
 }
+
+// This task checks HEAD if it obeys commit conventions.
+// Can be used in pre-commit jobs.
+task checkHeadForUpstreamChanges {
+  doLast {
+    def downstream = Grgit.open(dir: projectDir)
+    try {
+      // view the HEAD
+      downstream.show(commit: 'HEAD').each { diff ->
+        checkCommitDiffForUpstreamChanges(diff)
+      }
+    } finally {
+      downstream.close()
+    }
+  }
+}
+
+// This task checks the changes between the latest tag of upstream
+// release and the HEAD for any commits that doesn't obey commit conventions.
+// Can be used in post-commit jobs.
+task checkReleaseForUpstreamChanges {
+  doLast {
+    def downstream = Grgit.open(dir: projectDir)
+    try {
+      def (upstreamMajor, upstreamMinor, upstreamPatch) = version.tokenize('.')
+      def upstreamVersion = "${upstreamMajor}.${upstreamMinor}.${upstreamPatch}" // extract the upstream version
+      def baseCommit = downstream.resolve.toCommit(upstreamVersion)
+      downstream.log {
+        range("${baseCommit.id}", 'HEAD')
+      }.each { commit ->
+        downstream.show(commit: commit).each { diff ->
+          checkCommitDiffForUpstreamChanges(diff)
+        }
+      }
+    } finally {
+      downstream.close()
+    }
+  }
+}
+
+static def checkCommitDiffForUpstreamChanges(commitDiff) {
+  // if there are upstream changes, check if we have a ticket created
+  if (!shouldSkipCommit(commitDiff) && hasUpstreamChanges(commitDiff) && !commitDiff.commit.fullMessage.contains("[downstream_first]: KAFKA-")) {
+    println("Found a commit that doesn't obey conventions:")
+    println("  Commit Hash:   ${commitDiff.commit.id}")
+    println("  Author:        ${commitDiff.commit.author.name} <${commitDiff.commit.author.email}>")
+    println("  Short Message: ${commitDiff.commit.shortMessage}")
+    throw new GradleException("Found changes in ${commitDiff.commit.abbreviatedId} that aren't labelled as " +
+        "downstream_first. Please follow the development guidelines written at " +
+        "https://cloudera.atlassian.net/wiki/spaces/ENG/pages/100831927/Kafka+Development#KafkaDevelopment-Committingchangesdownstreamfirst " +
+        "and label your commit or move your stuff into a com.cloudera.kafka package.")
+  }
+}
+
+static def hasUpstreamChanges(commitDiff) {
+  return commitDiff.added.stream().anyMatch({ checkPathContainsUpstream(it) }) ||
+          commitDiff.copied.stream().anyMatch({ checkPathContainsUpstream(it) }) ||
+          commitDiff.modified.stream().anyMatch({ checkPathContainsUpstream(it) }) ||
+          commitDiff.removed.stream().anyMatch({ checkPathContainsUpstream(it) }) ||
+          commitDiff.renamings.values.stream().anyMatch({ checkPathContainsUpstream(it) })
+}
+
+static def shouldSkipCommit(commitDiff) {
+  def shortMsg = commitDiff.commit.shortMessage
+  // skip check if this is the Jenkins user
+  return "rel-eng@cloudera.com".equals(commitDiff.commit.author.email) ||
+      commitDiff.commit.fullMessage.contains("ignore_commit_convention_check") ||
+      (shortMsg.startsWith("KAFKA-") || shortMsg.startsWith("MINOR")) ||
+      (shortMsg.startsWith("[CLOUDERA_BUILD]") || shortMsg.startsWith("[CLOUDERA-BUILD]"))
+}
+
+static def checkPathContainsUpstream(path) {
+  def disallowedPaths = ["org/apache/kafka", "scala/kafka"]
+  def disallowed = disallowedPaths.findAll {
+    path.contains(it)
+  }
+  return disallowed.size() > 0
+}
+
+test.dependsOn('checkHeadForUpstreamChanges')

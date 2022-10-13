@@ -3738,9 +3738,15 @@ project(':connect:cloudera-authorization-extension') {
     testImplementation libs.jettyServlet
     testImplementation libs.jettyServlets
     testImplementation libs.httpclient
+    testImplementation project(':connect:basic-auth-extension')
+    testImplementation project(':connect:test-plugins')
     testImplementation project(':connect:runtime')
+    testImplementation project(':connect:runtime').sourceSets.test.output
     testImplementation project(':connect:cloudera-common').sourceSets.test.output
+    testImplementation project(':server-common').sourceSets.test.output
     testImplementation project(':clients').sourceSets.test.output
+    testImplementation project(':core')
+    testImplementation project(':core').sourceSets.test.output
 
     testRuntimeOnly libs.slf4jReload4j
   }

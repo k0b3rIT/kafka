@@ -555,6 +555,8 @@
           <allow pkg="com.cloudera.kafka.connect" />
           <allow pkg="org.apache.kafka.connect.rest"/>
           <allow pkg="org.apache.kafka.connect.runtime"/>
+          <allow pkg="org.apache.kafka.connect.tools"/>
+          <allow pkg="org.apache.kafka.connect.util.clusters"/>
 
           <allow pkg="org.apache.http" />
           <allow pkg="org.eclipse.jetty" />

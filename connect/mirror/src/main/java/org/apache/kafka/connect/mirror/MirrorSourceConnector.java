@@ -107,6 +107,7 @@ public class MirrorSourceConnector extends SourceConnector {
     private Admin sourceAdminClient;
     private Admin targetAdminClient;
     private volatile boolean useIncrementalAlterConfigs;
+    private TopicListener topicListener;
 
     public MirrorSourceConnector() {
         // nop
@@ -120,11 +121,12 @@ public class MirrorSourceConnector extends SourceConnector {
 
     // visible for testing
     MirrorSourceConnector(SourceAndTarget sourceAndTarget, ReplicationPolicy replicationPolicy,
-            TopicFilter topicFilter, ConfigPropertyFilter configPropertyFilter) {
+            TopicFilter topicFilter, ConfigPropertyFilter configPropertyFilter, TopicListener topicListener) {
         this.sourceAndTarget = sourceAndTarget;
         this.replicationPolicy = replicationPolicy;
         this.topicFilter = topicFilter;
         this.configPropertyFilter = configPropertyFilter;
+        this.topicListener = topicListener;
     }
 
     // visible for testing the deprecated setting "use.incremental.alter.configs"
@@ -162,6 +164,7 @@ public class MirrorSourceConnector extends SourceConnector {
         sourceAdminClient = config.forwardingAdmin(config.sourceAdminConfig("replication-source-admin"));
         targetAdminClient = config.forwardingAdmin(config.targetAdminConfig("replication-target-admin"));
         useIncrementalAlterConfigs =  !config.useIncrementalAlterConfigs().equals(MirrorSourceConfig.NEVER_USE_INCREMENTAL_ALTER_CONFIGS);
+        topicListener = config.topicListener();
 
         scheduler = new Scheduler(getClass(), config.entityLabel(), config.adminTimeout());
         scheduler.execute(this::createOffsetSyncsTopic, "creating upstream offset-syncs topic");
@@ -188,6 +191,7 @@ public class MirrorSourceConnector extends SourceConnector {
         Utils.closeQuietly(configPropertyFilter, "config property filter");
         Utils.closeQuietly(sourceAdminClient, "source admin client");
         Utils.closeQuietly(targetAdminClient, "target admin client");
+        Utils.closeQuietly(topicFilter, "topic listener");
         log.info("Stopping {} took {} ms.", connectorName, System.currentTimeMillis() - start);
     }
 
@@ -368,6 +372,16 @@ public class MirrorSourceConnector extends SourceConnector {
         missingInTarget.removeAll(upstreamTargetTopicPartitions);
 
         knownTargetTopicPartitions = targetTopicPartitions;
+
+        Map<String, String> upstreamToDownstreamTopics = sourceTopicPartitionsSet
+                .stream()
+                .map(TopicPartition::topic)
+                .distinct()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        topic -> replicationPolicy.formatRemoteTopic(sourceAndTarget.source(), topic)
+                ));
+        topicListener.topicsChanged(upstreamToDownstreamTopics);
 
         // Detect if topic-partitions were added or deleted from the source cluster
         // or if topic-partitions are missing from the target cluster

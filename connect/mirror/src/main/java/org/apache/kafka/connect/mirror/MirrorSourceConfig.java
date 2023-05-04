@@ -113,6 +113,10 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
     public static final String OFFSET_SYNCS_TARGET_PRODUCER_ROLE = OFFSET_SYNCS_CLIENT_ROLE_PREFIX + "target-producer";
     public static final String OFFSET_SYNCS_SOURCE_ADMIN_ROLE = OFFSET_SYNCS_CLIENT_ROLE_PREFIX + "source-admin";
     public static final String OFFSET_SYNCS_TARGET_ADMIN_ROLE = OFFSET_SYNCS_CLIENT_ROLE_PREFIX + "target-admin";
+    public static final String TOPIC_LISTENER_CLASS_CONFIG = "topic.listener.class";
+    public static final Class<? extends TopicListener> TOPIC_LISTENER_CLASS_DEFAULT = DefaultTopicListener.class;
+    public static final String TOPIC_LISTENER_CLASS_DOC =
+            "Class listening to changes in the list of replicated topics.";
 
     public static final String REPLICATION_RECORDS_LAG_CALC_PERIOD_MS = "replication.records.lag.calc.period.ms";
     private static final String REPLICATION_RECORDS_LAG_CALC_PERIOD_MS_DOC =
@@ -226,6 +230,10 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
 
     Duration consumerPollTimeout() {
         return Duration.ofMillis(getLong(CONSUMER_POLL_TIMEOUT_MILLIS));
+    }
+
+    TopicListener topicListener() {
+        return getConfiguredInstance(TOPIC_LISTENER_CLASS_CONFIG, TopicListener.class);
     }
 
     long replicationRecordsLagCalcPeriodMs() {
@@ -372,6 +380,12 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
                         ADD_SOURCE_ALIAS_TO_METRICS_DEFAULT,
                         ConfigDef.Importance.LOW,
                         ADD_SOURCE_ALIAS_TO_METRICS_DOC)
+                .define(
+                        TOPIC_LISTENER_CLASS_CONFIG,
+                        ConfigDef.Type.CLASS,
+                        TOPIC_LISTENER_CLASS_DEFAULT,
+                        ConfigDef.Importance.LOW,
+                        TOPIC_LISTENER_CLASS_DOC)
                 .define(
                         EMIT_OFFSET_SYNCS_ENABLED,
                         ConfigDef.Type.BOOLEAN,

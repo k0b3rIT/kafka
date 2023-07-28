@@ -95,7 +95,7 @@ public class AuthorizationSecurityRestExtensionTest {
         replay(configurable);
         replay(context);
         configs.put(ConnectSecurityConfig.KAFKA_CONNECT_AUTHORIZER_CLASS_NAME_CONFIG, "com.cloudera.kafka.connect.rest.authorization.extension.TestConnectAuthorizer");
-        configs.put(ConnectSecurityConfig.KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG, "superUser");
+        configs.put(ConnectSecurityConfig.KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG, "superUser");
 
         try (AuthorizationSecurityRestExtension extension = new AuthorizationSecurityRestExtension()) {
             extension.configure(configs);

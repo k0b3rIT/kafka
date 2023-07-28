@@ -26,9 +26,14 @@ import org.apache.kafka.common.config.ConfigException;
 
 import com.cloudera.kafka.connect.authorization.ConnectAuthorizer;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toMap;
 
 /**
@@ -42,9 +47,12 @@ public class ConnectSecurityConfig extends AbstractConfig {
 
     public static final String KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG =
             "kafka.connect.authorizer.super.user.principal.name";
+
+    public static final String KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG =
+            "kafka.connect.authorizer.super.user.principal.names";
     public static final String KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_DOC =
-            "The super user principal name which will be exempt from authorization. " +
-            "Only the super user can access internal Connect endpoints, so this must match the principal used by the" +
+            "The super user principal names which will be exempt from authorization. " +
+            "Only the super users can access internal Connect endpoints, so this must match the principal used by the" +
             " Connect workers.";
 
     private static final ConfigDef CONFIG = new ConfigDef()
@@ -56,9 +64,9 @@ public class ConnectSecurityConfig extends AbstractConfig {
                     KAFKA_CONNECT_AUTHORIZER_CLASS_NAME_DOC
             )
             .define(
-                    KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG,
-                    Type.STRING,
-                    null,
+                    KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG,
+                    Type.LIST,
+                    emptyList(),
                     Importance.HIGH,
                     KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_DOC
             );
@@ -66,10 +74,10 @@ public class ConnectSecurityConfig extends AbstractConfig {
     public ConnectSecurityConfig(Map<String, ?> props) {
         super(CONFIG, sanitizeConfigs(props));
         if (isAuthorizerEnabled()) {
-            String superUser = getSuperUserPrincipalName();
+            Set<String> superUser = getSuperUserPrincipalNames();
             if (superUser == null || superUser.isEmpty()) {
                 throw new ConfigException(
-                        KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG,
+                        KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG,
                         superUser,
                         "Super user principal name must be provided when authorization is enabled."
                 );
@@ -96,8 +104,14 @@ public class ConnectSecurityConfig extends AbstractConfig {
         return getConfiguredInstance(KAFKA_CONNECT_AUTHORIZER_CLASS_NAME_CONFIG, ConnectAuthorizer.class);
     }
 
-    public String getSuperUserPrincipalName() {
-        return getString(KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG);
+    public Set<String> getSuperUserPrincipalNames() {
+        List<String> usernames = getList(KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG);
+        if (usernames.isEmpty() && originals().containsKey(KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG)) {
+            // Fallback on old config
+            usernames = singletonList(originals()
+                    .get(KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG).toString());
+        }
+        return Collections.unmodifiableSet(new HashSet<>(usernames));
     }
 
     public static Set<String> configNames() {

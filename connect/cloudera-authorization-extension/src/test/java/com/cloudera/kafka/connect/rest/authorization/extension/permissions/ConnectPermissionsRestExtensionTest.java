@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.cloudera.kafka.connect.rest.authorization.extension.ConnectSecurityConfig.KAFKA_CONNECT_AUTHORIZER_CLASS_NAME_CONFIG;
-import static com.cloudera.kafka.connect.rest.authorization.extension.ConnectSecurityConfig.KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG;
+import static com.cloudera.kafka.connect.rest.authorization.extension.ConnectSecurityConfig.KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConnectPermissionsRestExtensionTest {
@@ -42,7 +42,7 @@ class ConnectPermissionsRestExtensionTest {
     void configure() {
         Map<String, Object> config = new HashMap<>();
         config.put(KAFKA_CONNECT_AUTHORIZER_CLASS_NAME_CONFIG, TestConnectAuthorizer.class.getName());
-        config.put(KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAME_CONFIG, "superUser");
+        config.put(KAFKA_CONNECT_AUTHORIZER_SUPER_USER_PRINCIPAL_NAMES_CONFIG, "superUser");
         // this shouldn't result in NoClassDefFoundError
         config.put("config.providers", "com.foo.bar.NonExistingConfigProvider");
         ConnectPermissionsRestExtension extension = new ConnectPermissionsRestExtension();

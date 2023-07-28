@@ -53,7 +53,8 @@ public class TrustedProxyProvider {
 
         // Authorization service
         TrustedProxyAuthorizationService authorizationService = new TrustedProxyAuthorizationService();
-        TrustedProxyLoginService spnegoLoginService = new TrustedProxyLoginService(servicePrincipal.getRealm(), authorizationService, trustedProxies);
+        TrustedProxyLoginService spnegoLoginService = new TrustedProxyLoginService(servicePrincipal.getRealm(),
+                authorizationService, trustedProxies, config.getKerberosPrincipalToLocalRules());
         spnegoLoginService.addBean(authorizationService);
         spnegoLoginService.setKeyTabPath(Paths.get(keytabPath));
         spnegoLoginService.setServiceName(servicePrincipal.getPrimary());

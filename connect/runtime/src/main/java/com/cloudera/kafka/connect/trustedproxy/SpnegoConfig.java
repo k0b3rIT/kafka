@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toMap;
 
 public class SpnegoConfig extends AbstractConfig {
@@ -54,6 +55,14 @@ public class SpnegoConfig extends AbstractConfig {
     public static final String TICKET_CACHE_PATH_CONFIG = "kafka.connect.spnego.ticket.cache.path";
     public static final String TICKET_CACHE_PATH_DOC = "Path of the ticket cache to be used by the Connect worker. Only used if " + USE_TICKET_CACHE_CONFIG + " is true.";
 
+    public static final String KERBEROS_PRINCIPAL_TO_LOCAL_RULES_CONFIG =
+            "kafka.connect.spnego.kerberos.principal.to.local.rules";
+    public static final String KERBEROS_PRINCIPAL_TO_LOCAL_RULES_DOC = "A list of rules for mapping from principal " +
+            "names to short names (typically operating system usernames). The rules are evaluated in order and the " +
+            "first rule that matches a principal name is used to map it to a short name. Any later rules in the list are " +
+            "ignored. By default, principal names of the form <code>{username}/{hostname}@{REALM}</code> are mapped " +
+            "to <code>{username}</code>. When not specified, the short name will be used.";
+
     protected static final ConfigDef CONFIG_DEF = new ConfigDef()
             .define(SPNEGO_ENABLED_CONFIG, ConfigDef.Type.BOOLEAN, false,
                     ConfigDef.Importance.MEDIUM, SPNEGO_ENABLED_DOC)
@@ -72,7 +81,9 @@ public class SpnegoConfig extends AbstractConfig {
             .define(USE_TICKET_CACHE_CONFIG, ConfigDef.Type.BOOLEAN, false,
                     ConfigDef.Importance.LOW, USE_TICKET_CACHE_DOC)
             .define(TICKET_CACHE_PATH_CONFIG, ConfigDef.Type.STRING, null,
-                    new ReadableFileValidator(), ConfigDef.Importance.LOW, TICKET_CACHE_PATH_DOC);
+                    new ReadableFileValidator(), ConfigDef.Importance.LOW, TICKET_CACHE_PATH_DOC)
+            .define(KERBEROS_PRINCIPAL_TO_LOCAL_RULES_CONFIG, ConfigDef.Type.LIST, emptyList(),
+                    ConfigDef.Importance.MEDIUM, KERBEROS_PRINCIPAL_TO_LOCAL_RULES_DOC);
 
     private final PrincipalName servicePrincipal;
 
@@ -128,6 +139,10 @@ public class SpnegoConfig extends AbstractConfig {
 
     public String getTicketCachePath() {
         return getString(TICKET_CACHE_PATH_CONFIG);
+    }
+
+    public List<String> getKerberosPrincipalToLocalRules() {
+        return getList(KERBEROS_PRINCIPAL_TO_LOCAL_RULES_CONFIG);
     }
 
     public static class ReadableFileValidator implements ConfigDef.Validator {

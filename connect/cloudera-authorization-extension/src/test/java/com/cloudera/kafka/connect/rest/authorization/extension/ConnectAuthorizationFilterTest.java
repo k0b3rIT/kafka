@@ -67,6 +67,7 @@ public class ConnectAuthorizationFilterTest {
 
     private static final String PRINCIPAL_NAME = "user";
     private static final String SUPER_USER_PRINCIPAL_NAME = "superUser";
+    private static final Set<String> SUPER_USER_PRINCIPAL_NAMES = Collections.singleton(SUPER_USER_PRINCIPAL_NAME);
 
     private Principal principalMock;
     private ConnectClusterState clusterStateMock;
@@ -82,7 +83,7 @@ public class ConnectAuthorizationFilterTest {
         authorizer = mock(ConnectAuthorizer.class);
         connectAuthorizationFilter = new ConnectAuthorizationFilter(authorizer,
                 clusterStateMock,
-                SUPER_USER_PRINCIPAL_NAME
+                SUPER_USER_PRINCIPAL_NAMES
         );
     }
 

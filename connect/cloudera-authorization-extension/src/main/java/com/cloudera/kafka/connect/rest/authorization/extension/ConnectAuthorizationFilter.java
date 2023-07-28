@@ -130,13 +130,13 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
 
     private final ConnectAuthorizer authorizer;
     private final ConnectClusterState clusterState;
-    private final String superUserPrincipalName;
+    private final Set<String> superUserPrincipalNames;
 
     public ConnectAuthorizationFilter(ConnectAuthorizer authorizer, ConnectClusterState clusterState,
-                                      String superUserPrincipalName) {
+                                      Set<String> superUserPrincipalNames) {
         this.authorizer = Objects.requireNonNull(authorizer, "authorizer must not be null");
         this.clusterState = Objects.requireNonNull(clusterState, "clusterState must not be null");
-        this.superUserPrincipalName = Objects.requireNonNull(superUserPrincipalName, "superUserPrincipalName must not be null");
+        this.superUserPrincipalNames = Objects.requireNonNull(superUserPrincipalNames, "superUserPrincipalNames must not be null");
     }
 
     private static Response errorResponse(Status status, String message) {
@@ -304,7 +304,7 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
     }
 
     private boolean isSuperUser(String principalName) {
-        return superUserPrincipalName.equals(principalName);
+        return superUserPrincipalNames.contains(principalName);
     }
 
     private AuthActionOrErrorStatus getAuthActionOrErrorStatus(ContainerRequestContext request) {

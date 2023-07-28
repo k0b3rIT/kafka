@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Provides the ability to authorize incoming requests.
@@ -37,7 +38,7 @@ public class AuthorizationSecurityRestExtension implements ConnectRestExtension 
     private static final Logger LOG = LoggerFactory.getLogger(AuthorizationSecurityRestExtension.class);
 
     private ConnectAuthorizer authorizer;
-    private String superUserPrincipalName;
+    private Set<String> superUserPrincipalNames;
 
     @Override
     public void register(ConnectRestExtensionContext restPluginContext) {
@@ -48,7 +49,7 @@ public class AuthorizationSecurityRestExtension implements ConnectRestExtension 
 
         LOG.debug("Registering Cloudera auth request filter.");
         restPluginContext.configurable().register(
-                new ConnectAuthorizationFilter(authorizer, restPluginContext.clusterState(), superUserPrincipalName)
+                new ConnectAuthorizationFilter(authorizer, restPluginContext.clusterState(), superUserPrincipalNames)
         );
         LOG.debug("Finished registering Cloudera auth request filter.");
     }
@@ -61,7 +62,7 @@ public class AuthorizationSecurityRestExtension implements ConnectRestExtension 
     public void configure(Map<String, ?> configs) {
         ConnectSecurityConfig config = new ConnectSecurityConfig(configs);
         authorizer = ConnectAuthorizerInstance.getOrCreate(config);
-        superUserPrincipalName = config.getSuperUserPrincipalName();
+        superUserPrincipalNames = config.getSuperUserPrincipalNames();
     }
 
     @Override

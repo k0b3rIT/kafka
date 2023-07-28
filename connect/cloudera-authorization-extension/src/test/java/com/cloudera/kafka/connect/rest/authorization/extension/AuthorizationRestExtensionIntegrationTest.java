@@ -81,7 +81,7 @@ public class AuthorizationRestExtensionIntegrationTest {
         workerProps.put("kafka.connect.authorizer.role.admin.users", ADMIN_USER);
         workerProps.put("kafka.connect.authorizer.role.operator.users", OPERATOR_USER);
         workerProps.put("kafka.connect.authorizer.role.viewer.users", VIEWER_USER);
-        workerProps.put("kafka.connect.authorizer.super.user.principal.name", SUPER_USER);
+        workerProps.put("kafka.connect.authorizer.super.user.principal.names", SUPER_USER);
 
         // Register rest extension
         workerProps.put(RestServerConfig.REST_EXTENSION_CLASSES_CONFIG, REST_EXTENSIONS);

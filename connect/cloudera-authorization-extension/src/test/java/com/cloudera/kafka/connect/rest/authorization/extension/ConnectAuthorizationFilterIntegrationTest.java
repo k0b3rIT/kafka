@@ -78,6 +78,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class ConnectAuthorizationFilterIntegrationTest {
     private static final String NORMAL_USER = "user";
     private static final String SUPER_USER_PRINCIPAL_NAME = "superUser";
+    private static final Set<String> SUPER_USER_PRINCIPAL_NAMES = Collections.singleton(SUPER_USER_PRINCIPAL_NAME);
 
     private ConnectClusterStateImpl clusterState;
     private TestConnectRestServer restServer;
@@ -94,7 +95,7 @@ public class ConnectAuthorizationFilterIntegrationTest {
         authenticator = new AuthenticationFilter(principal);
         restServer = new TestConnectRestServer();
         restServer.start();
-        filter = new ConnectAuthorizationFilter(authorizer, clusterState, SUPER_USER_PRINCIPAL_NAME);
+        filter = new ConnectAuthorizationFilter(authorizer, clusterState, SUPER_USER_PRINCIPAL_NAMES);
     }
 
     @AfterEach
@@ -488,7 +489,8 @@ public class ConnectAuthorizationFilterIntegrationTest {
             new AuthorizableAction(connectorResource("new-connector"), Operation.CREATE)));
         String json;
 
-        expect(principal.getName()).andReturn(superUser ? SUPER_USER_PRINCIPAL_NAME : NORMAL_USER).anyTimes();
+        expect(principal.getName())
+                .andReturn(superUser ? SUPER_USER_PRINCIPAL_NAME : NORMAL_USER).anyTimes();
         if (isSuccessful) {
             json = "{\"name\":\"new-connector\", \"config\":{\"topic\":\"test\"}}";
             Map<String, String> expectedConfig = new HashMap<>();

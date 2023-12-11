@@ -16,7 +16,7 @@
  */
 // Copyright (c) 2019 Cloudera, Inc. All rights reserved.
 
-package org.apache.kafka.common.security.ldap.internals;
+package com.cloudera.kafka.security.ldap.internals;
 
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.security.JaasContext;
@@ -60,7 +60,7 @@ public class LdapPlainServerCallbackHandler extends PlainServerCallbackHandler {
                 LdapSSLSocketFactory.init(configs);
                 @SuppressWarnings("unchecked")
                 Map<String, Object> env = (Map<String, Object>) contextFactory.getEnvironment();
-                env.put("java.naming.ldap.factory.socket", "org.apache.kafka.common.security.ldap.internals.LdapSSLSocketFactory");
+                env.put("java.naming.ldap.factory.socket", "com.cloudera.kafka.security.ldap.internals.LdapSSLSocketFactory");
             }
         }
         realm.setUserDnTemplate(userDnTemplate);

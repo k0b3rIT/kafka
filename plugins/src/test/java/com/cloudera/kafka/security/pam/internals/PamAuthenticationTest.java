@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 // Copyright (c) 2019 Cloudera, Inc. All rights reserved.
-package org.apache.kafka.common.security.pam.internals;
+package com.cloudera.kafka.security.pam.internals;
 
 import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.apache.kafka.common.security.JaasContext;

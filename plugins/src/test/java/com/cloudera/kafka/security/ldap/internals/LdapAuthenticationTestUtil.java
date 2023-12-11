@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.kafka.common.security.ldap.internals;
+package com.cloudera.kafka.security.ldap.internals;
 
 import org.apache.commons.lang.SystemUtils;
 import org.apache.directory.api.ldap.model.entry.DefaultEntry;

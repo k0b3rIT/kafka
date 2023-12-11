@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 // Copyright (c) 2023 Cloudera, Inc. All rights reserved.
-package org.apache.kafka.common.security.ldap.internals;
+package com.cloudera.kafka.security.ldap.internals;
 
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;

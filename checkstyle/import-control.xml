@@ -129,8 +129,8 @@
         <subpackage name="internals">
           <allow pkg="org.apache.shiro" />
           <!-- for testing -->
-          <allow pkg= "org.apache.directory.server" />
-          <allow pkg= "org.apache.directory.api" />
+          <allow pkg="org.apache.directory.server" />
+          <allow pkg="org.apache.directory.api" />
         </subpackage>
       </subpackage>
       <subpackage name="pam">
@@ -745,6 +745,23 @@
     <subpackage name="security">
       <allow pkg="org.apache.kafka.connect" />
       <allow pkg="com.sun.security.auth.module" />
+    </subpackage>
+  </subpackage>
+
+  <subpackage name="security">
+    <subpackage name="ldap">
+      <subpackage name="internals">
+        <allow pkg="org.apache.shiro" />
+        <!-- for testing -->
+        <allow pkg="org.apache.directory.server" />
+        <allow pkg="org.apache.directory.api" />
+        <allow pkg="org.apache.kafka.common.config" />
+      </subpackage>
+    </subpackage>
+    <subpackage name="pam">
+      <subpackage name="internals">
+        <allow pkg="org.jvnet.libpam" />
+      </subpackage>
     </subpackage>
   </subpackage>
 

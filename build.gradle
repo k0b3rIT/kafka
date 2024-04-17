@@ -939,6 +939,7 @@ project(':core') {
     implementation project(':server')
 
     implementation libs.argparse4j
+    implementation libs.caffeine
     implementation libs.commonsValidator
     implementation libs.jacksonDatabind
     implementation libs.jacksonModuleScala

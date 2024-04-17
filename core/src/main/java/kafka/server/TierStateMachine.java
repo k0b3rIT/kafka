@@ -99,7 +99,8 @@ public class TierStateMachine {
         long leaderLocalStartOffset = epochAndLeaderLocalStartOffset.offset();
 
         long offsetToFetch;
-        replicaMgr.brokerTopicStats().topicStats(topicPartition.topic()).buildRemoteLogAuxStateRequestRate().mark();
+        replicaMgr.brokerTopicStats().topicStats(topicPartition.topic(), null).buildRemoteLogAuxStateRequestRate().mark();
+        replicaMgr.brokerTopicStats().topicStats(topicPartition.topic(), topicPartition.partition()).buildRemoteLogAuxStateRequestRate().mark();
         replicaMgr.brokerTopicStats().allTopicsStats().buildRemoteLogAuxStateRequestRate().mark();
 
         UnifiedLog unifiedLog;
@@ -112,7 +113,8 @@ public class TierStateMachine {
         try {
             offsetToFetch = buildRemoteLogAuxState(topicPartition, currentFetchState.currentLeaderEpoch(), leaderLocalStartOffset, epoch, fetchPartitionData.logStartOffset(), unifiedLog);
         } catch (RemoteStorageException e) {
-            replicaMgr.brokerTopicStats().topicStats(topicPartition.topic()).failedBuildRemoteLogAuxStateRate().mark();
+            replicaMgr.brokerTopicStats().topicStats(topicPartition.topic(), null).failedBuildRemoteLogAuxStateRate().mark();
+            replicaMgr.brokerTopicStats().topicStats(topicPartition.topic(), topicPartition.partition()).failedBuildRemoteLogAuxStateRate().mark();
             replicaMgr.brokerTopicStats().allTopicsStats().failedBuildRemoteLogAuxStateRate().mark();
             throw e;
         }

@@ -808,8 +808,8 @@ public class TopicCommandIntegrationTest extends kafka.integration.KafkaServerTe
         );
 
         // Produce multiple batches.
-        TestUtils.generateAndProduceMessages(brokers(), testTopicName, 10, -1);
-        TestUtils.generateAndProduceMessages(brokers(), testTopicName, 10, -1);
+        TestUtils.generateAndProduceMessages(brokers(), testTopicName, 10, -1, null);
+        TestUtils.generateAndProduceMessages(brokers(), testTopicName, 10, -1, null);
 
         // Enable throttling. Note the broker config sets the replica max fetch bytes to `1` upon to minimize replication
         // throughput so the reassignment doesn't complete quickly.

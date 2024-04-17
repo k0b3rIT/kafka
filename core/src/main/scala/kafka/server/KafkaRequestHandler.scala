@@ -26,10 +26,12 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.yammer.metrics.core.Meter
 import org.apache.kafka.common.internals.FatalExitError
 import org.apache.kafka.common.utils.{KafkaThread, Time}
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.server.log.remote.storage.RemoteStorageMetrics
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 import org.apache.kafka.storage.log.metrics.BrokerTopicMetrics
 
+import java.util.Optional
 import scala.collection.mutable
 
 trait ApiRequestHandler {
@@ -125,7 +127,7 @@ class KafkaRequestHandler(
           val originalRequest = callback.originalRequest
           try {
 
-            // If we've already executed a callback for this request, reset the times and subtract the callback time from the 
+            // If we've already executed a callback for this request, reset the times and subtract the callback time from the
             // new dequeue time. This will allow calculation of multiple callback times.
             // Otherwise, set dequeue time to now.
             if (originalRequest.callbackRequestDequeueTimeNanos.isDefined) {
@@ -135,7 +137,7 @@ class KafkaRequestHandler(
             } else {
               originalRequest.callbackRequestDequeueTimeNanos = Some(time.nanoseconds())
             }
-            
+
             threadCurrentRequest.set(originalRequest)
             callback.fun(requestLocal)
           } catch {
@@ -167,7 +169,7 @@ class KafkaRequestHandler(
             request.releaseBuffer()
           }
 
-        case RequestChannel.WakeupRequest => 
+        case RequestChannel.WakeupRequest =>
           // We should handle this in receiveRequest by polling callbackQueue.
           warn("Received a wakeup request outside of typical usage.")
 
@@ -248,14 +250,20 @@ class KafkaRequestHandlerPool(
 class BrokerTopicStats(remoteStorageEnabled: Boolean = false) extends Logging {
 
   private val valueFactory = (k: String) => new BrokerTopicMetrics(k, remoteStorageEnabled)
+  private val topicPartitionValueFactory = (k: (String, Integer)) => new BrokerTopicMetrics(Optional.of(k._1), Optional.of(k._2.toString), remoteStorageEnabled)
+  private val topicPartitionStats = new Pool[(String, Integer), BrokerTopicMetrics](Some(topicPartitionValueFactory))
   private val stats = new Pool[String, BrokerTopicMetrics](Some(valueFactory))
   val allTopicsStats = new BrokerTopicMetrics(remoteStorageEnabled)
 
   def isTopicStatsExisted(topic: String): Boolean =
     stats.contains(topic)
 
-  def topicStats(topic: String): BrokerTopicMetrics =
-    stats.getAndMaybePut(topic)
+  def topicStats(topic: String, partition: Integer = null): BrokerTopicMetrics = {
+    if (partition != null)
+      topicPartitionStats.getAndMaybePut((topic, partition))
+    else
+      stats.getAndMaybePut(topic)
+  }
 
   def updateReplicationBytesIn(value: Long): Unit = {
     allTopicsStats.replicationBytesInRate.ifPresent { metric =>
@@ -283,7 +291,12 @@ class BrokerTopicStats(remoteStorageEnabled: Boolean = false) extends Logging {
 
   // This method only removes metrics only used for leader
   def removeOldLeaderMetrics(topic: String): Unit = {
-    val topicMetrics = topicStats(topic)
+    removeOldLeaderMetrics(topic, null)
+  }
+
+  // This method only removes metrics only used for leader
+  def removeOldLeaderMetrics(topic: String, partition: Integer): Unit = {
+    val topicMetrics = topicStats(topic, partition)
     if (topicMetrics != null) {
       topicMetrics.closeMetric(BrokerTopicMetrics.MESSAGE_IN_PER_SEC)
       topicMetrics.closeMetric(BrokerTopicMetrics.BYTES_IN_PER_SEC)
@@ -316,7 +329,12 @@ class BrokerTopicStats(remoteStorageEnabled: Boolean = false) extends Logging {
 
   // This method only removes metrics only used for follower
   def removeOldFollowerMetrics(topic: String): Unit = {
-    val topicMetrics = topicStats(topic)
+    removeOldFollowerMetrics(topic, null)
+  }
+
+  // This method only removes metrics only used for follower
+  def removeOldFollowerMetrics(topic: String, partition: Integer): Unit = {
+    val topicMetrics = topicStats(topic, partition)
     if (topicMetrics != null) {
       topicMetrics.closeMetric(BrokerTopicMetrics.REPLICATION_BYTES_IN_PER_SEC)
       topicMetrics.closeMetric(BrokerTopicMetrics.REASSIGNMENT_BYTES_IN_PER_SEC)
@@ -329,13 +347,19 @@ class BrokerTopicStats(remoteStorageEnabled: Boolean = false) extends Logging {
       metrics.close()
   }
 
-  def updateBytesOut(topic: String, isFollower: Boolean, isReassignment: Boolean, value: Long): Unit = {
+  def removeMetrics(topicPartition: TopicPartition): Unit = {
+    val partitionMetrics = topicPartitionStats.remove(Tuple2(topicPartition.topic, topicPartition.partition))
+    if (partitionMetrics != null) partitionMetrics.close()
+  }
+
+  def updateBytesOut(topicPartition: TopicPartition, isFollower: Boolean, isReassignment: Boolean, value: Long): Unit = {
     if (isFollower) {
       if (isReassignment)
         updateReassignmentBytesOut(value)
       updateReplicationBytesOut(value)
     } else {
-      topicStats(topic).bytesOutRate.mark(value)
+      topicStats(topicPartition.topic()).bytesOutRate.mark(value)
+      topicStats(topicPartition.topic(), topicPartition.partition).bytesOutRate.mark(value)
       allTopicsStats.bytesOutRate.mark(value)
     }
   }
@@ -469,6 +493,7 @@ class BrokerTopicStats(remoteStorageEnabled: Boolean = false) extends Logging {
   def close(): Unit = {
     allTopicsStats.close()
     stats.values.foreach(_.close())
+    topicPartitionStats.values.foreach(_.close())
 
     info("Broker and topic stats closed")
   }

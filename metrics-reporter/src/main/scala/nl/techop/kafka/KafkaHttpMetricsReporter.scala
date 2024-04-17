@@ -16,6 +16,7 @@
 
 package nl.techop.kafka
 
+import com.cloudera.kafka.producer.ProducerDetailsServlet
 import com.cloudera.kafka.prometheus.metrics.reporting.PrometheusMetricsServlet
 import com.cloudera.kafka.wrap.Kafka
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider
@@ -163,6 +164,8 @@ private class KafkaHttpMetricsReporter extends KafkaServerMetricsReporter
 
   private def brokerServlets(servletContextHandler: ServletContextHandler, broker: KafkaBroker): Unit = {
     addPrometheusMetricsServlet(servletContextHandler, None)
+
+    addMetricsServlet(servletContextHandler, new ProducerDetailsServlet(broker), "/api/producer-details")
 
     val resourceConfig: ResourceConfig = new ResourceConfig
     resourceConfig.register(new JacksonJsonProvider(), 0)

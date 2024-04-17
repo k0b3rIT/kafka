@@ -22,6 +22,7 @@ import org.apache.kafka.server.metrics.KafkaMetricsGroup;
 import com.yammer.metrics.core.Meter;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -67,7 +68,20 @@ public class BrokerTopicMetrics {
     }
 
     private BrokerTopicMetrics(Optional<String> name, boolean remoteStorageEnabled) {
-        this.tags = name.map(s -> Collections.singletonMap("topic", s)).orElse(Collections.emptyMap());
+        this(name, Optional.empty(), remoteStorageEnabled);
+    }
+
+    public BrokerTopicMetrics(Optional<String> name, Optional<String> partition, boolean remoteStorageEnabled) {
+        this.tags = name.map(s -> {
+            if (!partition.isPresent()) {
+                return Collections.singletonMap("topic", s);
+            } else {
+                Map<String, String> map = new LinkedHashMap<>();
+                map.put("topic", s);
+                map.put("partition", partition.get());
+                return map;
+            }
+        }).orElse(Collections.emptyMap());
 
         metricTypeMap.put(MESSAGE_IN_PER_SEC, new MeterWrapper(MESSAGE_IN_PER_SEC, "messages"));
         metricTypeMap.put(BYTES_IN_PER_SEC, new MeterWrapper(BYTES_IN_PER_SEC, "bytes"));

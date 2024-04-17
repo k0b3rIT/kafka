@@ -108,6 +108,7 @@ class CoordinatorPartitionWriterTest {
       ArgumentMatchers.any(),
       ArgumentMatchers.any(),
       ArgumentMatchers.eq(Map(tp -> VerificationGuard.SENTINEL)),
+      ArgumentMatchers.any()
     )).thenAnswer( _ => {
       callbackCapture.getValue.apply(Map(
         tp -> new PartitionResponse(
@@ -217,6 +218,7 @@ class CoordinatorPartitionWriterTest {
       ArgumentMatchers.any(),
       ArgumentMatchers.any(),
       ArgumentMatchers.eq(Map(tp -> VerificationGuard.SENTINEL)),
+      ArgumentMatchers.any()
     )).thenAnswer(_ => {
       callbackCapture.getValue.apply(Map(
         tp -> new PartitionResponse(Errors.NOT_LEADER_OR_FOLLOWER)

@@ -698,8 +698,9 @@ object TestUtils extends Logging {
                            saslProperties: Option[Properties] = None,
                            keySerializer: Serializer[K] = new ByteArraySerializer,
                            valueSerializer: Serializer[V] = new ByteArraySerializer,
-                           enableIdempotence: Boolean = false): KafkaProducer[K, V] = {
-    val producerProps = new Properties
+                           enableIdempotence: Boolean = false,
+                           props: Properties = null): KafkaProducer[K, V] = {
+    val producerProps = if (props != null) props else new Properties
     producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList)
     producerProps.put(ProducerConfig.ACKS_CONFIG, acks.toString)
     producerProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMs.toString)
@@ -1261,8 +1262,9 @@ object TestUtils extends Logging {
   def produceMessages[B <: KafkaBroker](
       brokers: Seq[B],
       records: Seq[ProducerRecord[Array[Byte], Array[Byte]]],
-      acks: Int = -1): Unit = {
-    val producer = createProducer(plaintextBootstrapServers(brokers), acks = acks)
+      acks: Int = -1,
+      props: Properties = null): Unit = {
+    val producer = createProducer(plaintextBootstrapServers(brokers), acks = acks, props = props)
     try {
       val futures = records.map(producer.send)
       futures.foreach(_.get)
@@ -1278,13 +1280,14 @@ object TestUtils extends Logging {
       brokers: Seq[B],
       topic: String,
       numMessages: Int,
-      acks: Int = -1): Seq[String] = {
+      acks: Int = -1,
+      props: Properties = null): Seq[String] = {
     val values = (0 until numMessages).map(x =>  s"test-$x")
     val intSerializer = new IntegerSerializer()
     val records = values.zipWithIndex.map { case (v, i) =>
       new ProducerRecord(topic, intSerializer.serialize(topic, i), v.getBytes)
     }
-    produceMessages(brokers, records, acks)
+    produceMessages(brokers, records, acks, props)
     values
   }
 
@@ -1294,9 +1297,10 @@ object TestUtils extends Logging {
       message: String,
       timestamp: java.lang.Long = null,
       deliveryTimeoutMs: Int = 30 * 1000,
-      requestTimeoutMs: Int = 20 * 1000): Unit = {
+      requestTimeoutMs: Int = 20 * 1000,
+      props: Properties = null): Unit = {
     val producer = createProducer(plaintextBootstrapServers(brokers),
-      deliveryTimeoutMs = deliveryTimeoutMs, requestTimeoutMs = requestTimeoutMs)
+      deliveryTimeoutMs = deliveryTimeoutMs, requestTimeoutMs = requestTimeoutMs, props = props)
     try {
       producer.send(new ProducerRecord(topic, null, timestamp, topic.getBytes, message.getBytes)).get
     } finally {

@@ -1281,13 +1281,19 @@ class SocketServerTest {
   @Test
   def testRequestMetricsAfterStop(): Unit = {
     server.stopProcessingRequests()
+
+    // Mark the unversioned metrics (CDPD-27439)
+    server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate.mark()
+
+    // Mark the versioned metrics
     val version = ApiKeys.PRODUCE.latestVersion
     val version2 = (version - 1).toShort
     for (_ <- 0 to 1) server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version).mark()
     server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version2).mark()
     assertEquals(2, server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version).count())
     server.dataPlaneRequestChannel.updateErrorMetrics(ApiKeys.PRODUCE, Map(Errors.NONE -> 1))
-    val nonZeroMeters = Map(s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version" -> 2,
+    val nonZeroMeters = Map("kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce" -> 1,
+      s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version" -> 2,
       s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version2" -> 1,
       "kafka.network:type=RequestMetrics,name=ErrorsPerSec,request=Produce,error=NONE" -> 1)
 

@@ -3948,7 +3948,8 @@ class GroupCoordinatorTest {
       any(),
       any(classOf[RequestLocal]),
       any[ActionQueue],
-      any[Map[TopicPartition, VerificationGuard]]
+      any[Map[TopicPartition, VerificationGuard]],
+      any()
     )).thenAnswer(_ => {
       capturedArgument.getValue.apply(
         Map(new TopicPartition(Topic.GROUP_METADATA_TOPIC_NAME, groupPartitionId) ->
@@ -3984,7 +3985,8 @@ class GroupCoordinatorTest {
       any(),
       any(classOf[RequestLocal]),
       any[ActionQueue],
-      any[Map[TopicPartition, VerificationGuard]]
+      any[Map[TopicPartition, VerificationGuard]],
+      any()
     )).thenAnswer(_ => {
         capturedArgument.getValue.apply(
           Map(new TopicPartition(Topic.GROUP_METADATA_TOPIC_NAME, groupPartitionId) ->
@@ -4131,7 +4133,8 @@ class GroupCoordinatorTest {
       any(),
       any(classOf[RequestLocal]),
       any[ActionQueue],
-      any[Map[TopicPartition, VerificationGuard]]
+      any[Map[TopicPartition, VerificationGuard]],
+      any()
     )).thenAnswer(_ => {
       capturedArgument.getValue.apply(
         Map(new TopicPartition(Topic.GROUP_METADATA_TOPIC_NAME, groupPartitionId) ->
@@ -4189,7 +4192,8 @@ class GroupCoordinatorTest {
       any(),
       any(classOf[RequestLocal]),
       any[ActionQueue],
-      any[Map[TopicPartition, VerificationGuard]]
+      any[Map[TopicPartition, VerificationGuard]],
+      any()
     )).thenAnswer(_ => {
       capturedArgument.getValue.apply(
         Map(offsetTopicPartition ->

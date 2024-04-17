@@ -546,9 +546,9 @@ public class RemoteLogManagerTest {
         when(rlmCopyQuotaManager.getThrottleTimeMs()).thenReturn(quotaAvailableThrottleTime);
 
         // Verify the metrics for remote writes and for failures is zero before attempt to copy log segment
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyBytesRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyBytesRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyBytesRate().count());
@@ -587,10 +587,10 @@ public class RemoteLogManagerTest {
         assertEquals(oldSegmentEndOffset, argument.getValue());
 
         // Verify the metric for remote writes is updated correctly
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(10, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyBytesRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(10, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyBytesRate().count());
         // Verify we did not report any failure for remote writes
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(10, brokerTopicStats.allTopicsStats().remoteCopyBytesRate().count());
@@ -681,9 +681,9 @@ public class RemoteLogManagerTest {
         verify(remoteLogMetadataManager, never()).updateRemoteLogSegmentMetadata(any(RemoteLogSegmentMetadataUpdate.class));
 
         // Verify the metrics
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyBytesRate().count());
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyBytesRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyBytesRate().count());
@@ -762,9 +762,9 @@ public class RemoteLogManagerTest {
         verify(remoteLogMetadataManager, never()).updateRemoteLogSegmentMetadata(any(RemoteLogSegmentMetadataUpdate.class));
 
         // Verify the metrics
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyBytesRate().count());
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyBytesRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyBytesRate().count());
@@ -1233,8 +1233,8 @@ public class RemoteLogManagerTest {
         when(rlmCopyQuotaManager.getThrottleTimeMs()).thenReturn(quotaAvailableThrottleTime);
 
         // Verify the metrics for remote write requests/failures is zero before attempt to copy log segment
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteCopyRequestRate().count());
@@ -1247,8 +1247,8 @@ public class RemoteLogManagerTest {
         // Verify we should not have updated the highest offset because of write failure
         verify(mockLog).updateHighestOffsetInRemoteStorage(anyLong());
         // Verify the metric for remote write requests/failures was updated.
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(1, brokerTopicStats.allTopicsStats().failedRemoteCopyRequestRate().count());
@@ -1283,8 +1283,8 @@ public class RemoteLogManagerTest {
         when(mockLog.lastStableOffset()).thenReturn(250L);
 
         // Ensure the metrics for remote write requests/failures is zero before attempt to copy log segment
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Ensure aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteCopyRequestRate().count());
@@ -1299,8 +1299,8 @@ public class RemoteLogManagerTest {
         verify(mockLog, never()).updateHighestOffsetInRemoteStorage(anyLong());
 
         // Verify the metric for remote write requests/failures was not updated.
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteCopyRequestRate().count());
         // Verify aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteCopyRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteCopyRequestRate().count());
@@ -2267,8 +2267,8 @@ public class RemoteLogManagerTest {
                 .thenReturn(CompletableFuture.runAsync(() -> { }));
 
         // Verify the metrics for remote deletes and for failures is zero before attempt to delete segments
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteDeleteRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteDeleteRequestRate().count());
         // Verify aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().count());
@@ -2282,9 +2282,9 @@ public class RemoteLogManagerTest {
         verify(remoteStorageManager).deleteLogSegmentData(metadataList.get(1));
 
         // Verify the metric for remote delete is updated correctly
-        assertEquals(2, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteDeleteRequestRate().count());
+        assertEquals(2, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteDeleteRequestRate().count());
         // Verify we did not report any failure for remote deletes
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteDeleteRequestRate().count());
         // Verify aggregate metrics
         assertEquals(2, brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().count());
@@ -2336,8 +2336,8 @@ public class RemoteLogManagerTest {
                 .thenReturn(CompletableFuture.runAsync(() -> { }));
 
         // Verify the metrics for remote deletes and for failures is zero before attempt to delete segments
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteDeleteRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteDeleteRequestRate().count());
         // Verify aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().count());
@@ -2350,9 +2350,9 @@ public class RemoteLogManagerTest {
         verify(remoteStorageManager).deleteLogSegmentData(metadataList.get(1));
 
         // Verify the metric for remote delete is updated correctly
-        assertEquals(2, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteDeleteRequestRate().count());
+        assertEquals(2, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteDeleteRequestRate().count());
         // Verify we did not report any failure for remote deletes
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteDeleteRequestRate().count());
         // Verify aggregate metrics
         assertEquals(2, brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().count());
@@ -2620,8 +2620,8 @@ public class RemoteLogManagerTest {
                 .thenReturn(CompletableFuture.runAsync(() -> { }));
 
         // Verify the metrics for remote deletes and for failures is zero before attempt to delete segments
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteDeleteRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteDeleteRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteDeleteRequestRate().count());
         // Verify aggregate metrics
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().count());
@@ -2634,9 +2634,9 @@ public class RemoteLogManagerTest {
         verify(remoteStorageManager).deleteLogSegmentData(metadataList.get(0));
 
         // Verify the metric for remote delete is updated correctly
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteDeleteRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteDeleteRequestRate().count());
         // Verify we reported 1 failure for remote deletes
-        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).failedRemoteDeleteRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).failedRemoteDeleteRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().count());
         assertEquals(1, brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().count());
@@ -3413,18 +3413,18 @@ public class RemoteLogManagerTest {
         RemoteLogManager.RLMCopyTask rlmTask = (RemoteLogManager.RLMCopyTask) remoteLogManager.rlmCopyTask(leaderTopicIdPartition);
         assertNotNull(rlmTask);
         rlmTask.recordLagStats(1024, 2);
-        assertEquals(1024, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyLagBytes());
-        assertEquals(2, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyLagSegments());
+        assertEquals(1024, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyLagBytes());
+        assertEquals(2, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyLagSegments());
         // The same node becomes follower now which was the previous leader
         remoteLogManager.onLeadershipChange(Collections.emptySet(),
                 Collections.singleton(mockPartition(leaderTopicIdPartition)), topicIds);
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyLagBytes());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyLagSegments());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyLagBytes());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyLagSegments());
 
         // If the old task emits the tier-lag stats, then it should be discarded
         rlmTask.recordLagStats(2048, 4);
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyLagBytes());
-        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic()).remoteCopyLagSegments());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyLagBytes());
+        assertEquals(0, brokerTopicStats.topicStats(leaderTopicIdPartition.topic(), null).remoteCopyLagSegments());
     }
 
     @Test

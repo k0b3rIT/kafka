@@ -52,7 +52,8 @@ public class RemoteLogReader implements Callable<Void> {
         this.rlm = rlm;
         this.brokerTopicStats = brokerTopicStats;
         this.callback = callback;
-        this.brokerTopicStats.topicStats(fetchInfo.topicPartition.topic()).remoteFetchRequestRate().mark();
+        this.brokerTopicStats.topicStats(fetchInfo.topicPartition.topic(), null).remoteFetchRequestRate().mark();
+        this.brokerTopicStats.topicStats(fetchInfo.topicPartition.topic(), fetchInfo.topicPartition.partition()).remoteFetchRequestRate().mark();
         this.brokerTopicStats.allTopicsStats().remoteFetchRequestRate().mark();
         this.quotaManager = quotaManager;
         this.remoteReadTimer = remoteReadTimer;
@@ -64,13 +65,15 @@ public class RemoteLogReader implements Callable<Void> {
         try {
             LOGGER.debug("Reading records from remote storage for topic partition {}", fetchInfo.topicPartition);
             FetchDataInfo fetchDataInfo = remoteReadTimer.time(() -> rlm.read(fetchInfo));
-            brokerTopicStats.topicStats(fetchInfo.topicPartition.topic()).remoteFetchBytesRate().mark(fetchDataInfo.records.sizeInBytes());
+            brokerTopicStats.topicStats(fetchInfo.topicPartition.topic(), null).remoteFetchBytesRate().mark(fetchDataInfo.records.sizeInBytes());
+            brokerTopicStats.topicStats(fetchInfo.topicPartition.topic(), fetchInfo.topicPartition.partition()).remoteFetchBytesRate().mark(fetchDataInfo.records.sizeInBytes());
             brokerTopicStats.allTopicsStats().remoteFetchBytesRate().mark(fetchDataInfo.records.sizeInBytes());
             result = new RemoteLogReadResult(Optional.of(fetchDataInfo), Optional.empty());
         } catch (OffsetOutOfRangeException e) {
             result = new RemoteLogReadResult(Optional.empty(), Optional.of(e));
         } catch (Exception e) {
-            brokerTopicStats.topicStats(fetchInfo.topicPartition.topic()).failedRemoteFetchRequestRate().mark();
+            brokerTopicStats.topicStats(fetchInfo.topicPartition.topic(), null).failedRemoteFetchRequestRate().mark();
+            brokerTopicStats.topicStats(fetchInfo.topicPartition.topic(), fetchInfo.topicPartition.partition()).failedRemoteFetchRequestRate().mark();
             brokerTopicStats.allTopicsStats().failedRemoteFetchRequestRate().mark();
             LOGGER.error("Error occurred while reading the remote data for {}", fetchInfo.topicPartition, e);
             result = new RemoteLogReadResult(Optional.empty(), Optional.of(e));

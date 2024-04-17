@@ -42,7 +42,7 @@ import org.apache.kafka.server.common.MetadataVersion
 import org.apache.kafka.server.common.MetadataVersion.{IBP_0_8_2, IBP_3_0_IV1}
 import org.apache.kafka.server.config.{DelegationTokenManagerConfigs, KRaftConfigs, QuotaConfigs, ReplicationConfigs, ServerConfigs, ServerLogConfigs, ServerTopicConfigSynonyms, ShareGroupConfig, ZkConfigs}
 import org.apache.kafka.server.log.remote.storage.RemoteLogManagerConfig
-import org.apache.kafka.server.metrics.MetricConfigs
+import org.apache.kafka.server.metrics.{MetricConfigs, ProducerMetricConfigs}
 import org.apache.kafka.storage.internals.log.CleanerConfig
 import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.api.Test
@@ -1078,6 +1078,10 @@ class KafkaConfigTest {
         case DelegationTokenManagerConfigs.DELEGATION_TOKEN_MAX_LIFETIME_CONFIG => assertPropertyInvalid(baseProperties, name, "not_a_number", "0")
         case DelegationTokenManagerConfigs.DELEGATION_TOKEN_EXPIRY_TIME_MS_CONFIG => assertPropertyInvalid(baseProperties, name, "not_a_number", "0")
         case DelegationTokenManagerConfigs.DELEGATION_TOKEN_EXPIRY_CHECK_INTERVAL_MS_CONFIG => assertPropertyInvalid(baseProperties, name, "not_a_number", "0")
+
+        // Cloudera configs
+        case ProducerMetricConfigs.PRODUCER_WHITELIST_ENABLED_CONFIG => // ignore
+        case ProducerMetricConfigs.PRODUCER_WHITELIST_CONFIG => // ignore
 
         //Kafka Yammer metrics reporter configs
         case MetricConfigs.KAFKA_METRICS_REPORTER_CLASSES_CONFIG => // ignore

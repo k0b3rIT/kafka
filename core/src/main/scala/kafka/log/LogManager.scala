@@ -1538,6 +1538,11 @@ class LogManager(logDirs: Seq[File],
     }
     OptionalLong.of(brokerEpoch)
   }
+
+  /**
+   * Get a map of TopicPartition => Log
+   */
+  def logsByTopicPartition: Map[TopicPartition, UnifiedLog] = (currentLogs.toList ++ futureLogs.toList).toMap
 }
 
 object LogManager {
@@ -1683,4 +1688,6 @@ object LogManager {
       }
     }
   }
+
+
 }

@@ -910,14 +910,14 @@ public class RemoteLogManager implements Closeable {
                 }
             } catch (CustomMetadataSizeLimitExceededException e) {
                 // Only stop this task. Logging is done where the exception is thrown.
-                brokerTopicStats.topicStats(log.topicPartition().topic()).failedRemoteCopyRequestRate().mark();
+                brokerTopicStats.topicStats(log.topicPartition().topic(), null).failedRemoteCopyRequestRate().mark();
                 brokerTopicStats.allTopicsStats().failedRemoteCopyRequestRate().mark();
                 this.cancel();
             } catch (InterruptedException | RetriableException ex) {
                 throw ex;
             } catch (Exception ex) {
                 if (!isCancelled()) {
-                    brokerTopicStats.topicStats(log.topicPartition().topic()).failedRemoteCopyRequestRate().mark();
+                    brokerTopicStats.topicStats(log.topicPartition().topic(), null).failedRemoteCopyRequestRate().mark();
                     brokerTopicStats.allTopicsStats().failedRemoteCopyRequestRate().mark();
                     logger.error("Error occurred while copying log segments of partition: {}", topicIdPartition, ex);
                 }
@@ -949,7 +949,7 @@ public class RemoteLogManager implements Closeable {
             LogSegmentData segmentData = new LogSegmentData(logFile.toPath(), toPathIfExists(segment.offsetIndex().file()),
                     toPathIfExists(segment.timeIndex().file()), Optional.ofNullable(toPathIfExists(segment.txnIndex().file())),
                     producerStateSnapshotFile.toPath(), leaderEpochsIndex);
-            brokerTopicStats.topicStats(log.topicPartition().topic()).remoteCopyRequestRate().mark();
+            brokerTopicStats.topicStats(log.topicPartition().topic(), null).remoteCopyRequestRate().mark();
             brokerTopicStats.allTopicsStats().remoteCopyRequestRate().mark();
             Optional<CustomMetadata> customMetadata = Optional.empty();
             try {
@@ -988,7 +988,7 @@ public class RemoteLogManager implements Closeable {
             }
 
             remoteLogMetadataManager.updateRemoteLogSegmentMetadata(copySegmentFinishedRlsm).get();
-            brokerTopicStats.topicStats(log.topicPartition().topic())
+            brokerTopicStats.topicStats(log.topicPartition().topic(), null)
                 .remoteCopyBytesRate().mark(copySegmentStartedRlsm.segmentSizeInBytes());
             brokerTopicStats.allTopicsStats().remoteCopyBytesRate().mark(copySegmentStartedRlsm.segmentSizeInBytes());
 
@@ -1151,14 +1151,14 @@ public class RemoteLogManager implements Closeable {
                             new RemoteLogSegmentMetadataUpdate(segmentMetadata.remoteLogSegmentId(), time.milliseconds(),
                                     segmentMetadata.customMetadata(), RemoteLogSegmentState.DELETE_SEGMENT_STARTED, brokerId)).get();
 
-                    brokerTopicStats.topicStats(topic).remoteDeleteRequestRate().mark();
+                    brokerTopicStats.topicStats(topic, null).remoteDeleteRequestRate().mark();
                     brokerTopicStats.allTopicsStats().remoteDeleteRequestRate().mark();
 
                     // Delete the segment in remote storage.
                     try {
                         remoteLogStorageManager.deleteLogSegmentData(segmentMetadata);
                     } catch (RemoteStorageException e) {
-                        brokerTopicStats.topicStats(topic).failedRemoteDeleteRequestRate().mark();
+                        brokerTopicStats.topicStats(topic, null).failedRemoteDeleteRequestRate().mark();
                         brokerTopicStats.allTopicsStats().failedRemoteDeleteRequestRate().mark();
                         throw e;
                     }

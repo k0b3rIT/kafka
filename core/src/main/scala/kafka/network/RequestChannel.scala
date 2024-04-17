@@ -549,7 +549,8 @@ class RequestMetrics(name: String) {
   private val metricsGroup = new KafkaMetricsGroup(this.getClass)
 
   val tags: util.Map[String, String] = Map("request" -> name).asJava
-  private val requestRateInternal = new Pool[Short, Meter]()
+  val requestRate = metricsGroup.newMeter(RequestsPerSec, "requests", TimeUnit.SECONDS, tags)
+  val requestRateInternal = new Pool[Short, Meter]()
   private val deprecatedRequestRateInternal = new Pool[DeprecatedRequestRateKey, Meter]()
   // time a request spent in a request queue
   val requestQueueTimeHist: Histogram = metricsGroup.newHistogram(RequestQueueTimeMs, true, tags)

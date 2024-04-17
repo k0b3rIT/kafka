@@ -2530,6 +2530,7 @@ class KafkaApisTest extends Logging {
         any(),
         any(),
         any(),
+        any(),
         any()
       )).thenAnswer(_ => responseCallback.getValue.apply(Map(tp -> new PartitionResponse(Errors.INVALID_PRODUCER_EPOCH))))
 
@@ -2589,6 +2590,7 @@ class KafkaApisTest extends Logging {
         any(),
         any(),
         responseCallback.capture(),
+        any(),
         any(),
         any(),
         any(),
@@ -2657,6 +2659,7 @@ class KafkaApisTest extends Logging {
         any(),
         any(),
         any(),
+        any(),
         any())
       ).thenAnswer(_ => responseCallback.getValue.apply(Map(tp -> new PartitionResponse(Errors.NOT_LEADER_OR_FOLLOWER))))
 
@@ -2718,6 +2721,7 @@ class KafkaApisTest extends Logging {
         any(),
         any(),
         responseCallback.capture(),
+        any(),
         any(),
         any(),
         any(),
@@ -2784,6 +2788,7 @@ class KafkaApisTest extends Logging {
           anyShort,
           ArgumentMatchers.eq(false),
           ArgumentMatchers.eq(transactionalId),
+          any(),
           any(),
           any(),
           any(),
@@ -2964,6 +2969,7 @@ class KafkaApisTest extends Logging {
       any(),
       ArgumentMatchers.eq(requestLocal),
       any(),
+      any(),
       any()
     )).thenAnswer(_ => responseCallback.getValue.apply(Map(tp2 -> new PartitionResponse(Errors.NONE))))
     kafkaApis = createKafkaApis()
@@ -3096,6 +3102,7 @@ class KafkaApisTest extends Logging {
       any(),
       ArgumentMatchers.eq(requestLocal),
       any(),
+      any(),
       any()
     )).thenAnswer(_ => responseCallback.getValue.apply(Map(tp2 -> new PartitionResponse(Errors.NONE))))
     kafkaApis = createKafkaApis()
@@ -3152,6 +3159,7 @@ class KafkaApisTest extends Logging {
       any(),
       any(),
       ArgumentMatchers.eq(requestLocal),
+      any(),
       any(),
       any())
   }
@@ -3224,6 +3232,7 @@ class KafkaApisTest extends Logging {
       any(),
       any(),
       ArgumentMatchers.eq(RequestLocal.NoCaching),
+      any(),
       any(),
       any()
     )).thenAnswer { _ =>
@@ -3356,6 +3365,7 @@ class KafkaApisTest extends Logging {
       any(),
       any(),
       ArgumentMatchers.eq(RequestLocal.NoCaching),
+      any(),
       any(),
       any()
     )).thenAnswer { _ =>
@@ -5038,7 +5048,7 @@ class KafkaApisTest extends Logging {
     ).build()
 
     val requestChannelRequest = buildRequest(offsetCommitRequest)
-    
+
     metadataCache = MetadataCache.zkMetadataCache(brokerId, IBP_2_2_IV1)
     brokerEpochManager = new ZkBrokerEpochManager(metadataCache, controller, None)
     kafkaApis = createKafkaApis(IBP_2_2_IV1)

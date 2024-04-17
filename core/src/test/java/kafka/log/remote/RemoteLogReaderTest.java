@@ -89,9 +89,12 @@ public class RemoteLogReaderTest {
         assertEquals(100, recordedArg.getValue());
 
         // Verify metrics for remote reads are updated correctly
-        assertEquals(1, brokerTopicStats.topicStats(TOPIC).remoteFetchRequestRate().count());
-        assertEquals(100, brokerTopicStats.topicStats(TOPIC).remoteFetchBytesRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(TOPIC).failedRemoteFetchRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(TOPIC, null).remoteFetchRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(TOPIC, 0).remoteFetchRequestRate().count());
+        assertEquals(100, brokerTopicStats.topicStats(TOPIC, null).remoteFetchBytesRate().count());
+        assertEquals(100, brokerTopicStats.topicStats(TOPIC, 0).remoteFetchBytesRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(TOPIC, null).failedRemoteFetchRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(TOPIC, 0).failedRemoteFetchRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteFetchRequestRate().count());
         assertEquals(100, brokerTopicStats.allTopicsStats().remoteFetchBytesRate().count());
@@ -121,9 +124,12 @@ public class RemoteLogReaderTest {
         assertEquals(0, recordedArg.getValue());
 
         // Verify metrics for remote reads are updated correctly
-        assertEquals(1, brokerTopicStats.topicStats(TOPIC).remoteFetchRequestRate().count());
-        assertEquals(0, brokerTopicStats.topicStats(TOPIC).remoteFetchBytesRate().count());
-        assertEquals(1, brokerTopicStats.topicStats(TOPIC).failedRemoteFetchRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(TOPIC, null).remoteFetchRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(TOPIC, 0).remoteFetchRequestRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(TOPIC, null).remoteFetchBytesRate().count());
+        assertEquals(0, brokerTopicStats.topicStats(TOPIC, 0).remoteFetchBytesRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(TOPIC, null).failedRemoteFetchRequestRate().count());
+        assertEquals(1, brokerTopicStats.topicStats(TOPIC, 0).failedRemoteFetchRequestRate().count());
         // Verify aggregate metrics
         assertEquals(1, brokerTopicStats.allTopicsStats().remoteFetchRequestRate().count());
         assertEquals(0, brokerTopicStats.allTopicsStats().remoteFetchBytesRate().count());

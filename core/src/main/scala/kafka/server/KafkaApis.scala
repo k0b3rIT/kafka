@@ -731,6 +731,7 @@ class KafkaApis(val requestChannel: RequestChannel,
     if (authorizedRequestInfo.isEmpty)
       sendResponseCallback(Map.empty)
     else {
+      val clientId = request.header.clientId
       val internalTopicsAllowed = request.header.clientId == AdminUtils.ADMIN_CLIENT_ID
       val transactionSupportedOperation = if (request.header.apiVersion > 10) genericError else defaultError
       // call the replica manager to append messages to the replicas
@@ -743,7 +744,8 @@ class KafkaApis(val requestChannel: RequestChannel,
         responseCallback = sendResponseCallback,
         recordValidationStatsCallback = processingStatsCallback,
         requestLocal = requestLocal,
-        transactionSupportedOperation = transactionSupportedOperation)
+        transactionSupportedOperation = transactionSupportedOperation,
+        clientId = clientId)
 
       // if the request is put into the purgatory, it will have a held reference and hence cannot be garbage collected;
       // hence we clear its data here in order to let GC reclaim its memory since it is already appended to log
@@ -961,7 +963,7 @@ class KafkaApis(val requestChannel: RequestChannel,
             // If the topic name was not known, we will have no bytes out.
             if (topicResponse.topic != null) {
               val tp = new TopicIdPartition(topicResponse.topicId, new TopicPartition(topicResponse.topic, data.partitionIndex))
-              brokerTopicStats.updateBytesOut(tp.topic, fetchRequest.isFromFollower, reassigningPartitions.contains(tp), FetchResponse.recordsSize(data))
+              brokerTopicStats.updateBytesOut(tp.topicPartition(), fetchRequest.isFromFollower, reassigningPartitions.contains(tp), FetchResponse.recordsSize(data))
             }
           }
         }
@@ -4112,9 +4114,11 @@ class KafkaApis(val requestChannel: RequestChannel,
       request.header.apiKey match {
         case ApiKeys.PRODUCE =>
           brokerTopicStats.topicStats(tp.topic).produceMessageConversionsRate.mark(conversionCount)
+          brokerTopicStats.topicStats(tp.topic, tp.partition()).produceMessageConversionsRate.mark(conversionCount)
           brokerTopicStats.allTopicsStats.produceMessageConversionsRate.mark(conversionCount)
         case ApiKeys.FETCH =>
           brokerTopicStats.topicStats(tp.topic).fetchMessageConversionsRate.mark(conversionCount)
+          brokerTopicStats.topicStats(tp.topic, tp.partition()).fetchMessageConversionsRate.mark(conversionCount)
           brokerTopicStats.allTopicsStats.fetchMessageConversionsRate.mark(conversionCount)
         case _ =>
           throw new IllegalStateException("Message conversion info is recorded only for Produce/Fetch requests")

@@ -28,6 +28,7 @@ import org.apache.kafka.raft.QuorumConfig;
 import org.apache.kafka.security.PasswordEncoderConfigs;
 import org.apache.kafka.server.log.remote.storage.RemoteLogManagerConfig;
 import org.apache.kafka.server.metrics.MetricConfigs;
+import org.apache.kafka.server.metrics.ProducerMetricConfigs;
 import org.apache.kafka.storage.internals.log.CleanerConfig;
 import org.apache.kafka.storage.internals.log.LogConfig;
 
@@ -64,7 +65,8 @@ public abstract class AbstractKafkaConfig extends AbstractConfig {
             QuotaConfigs.CONFIG_DEF,
             BrokerSecurityConfigs.CONFIG_DEF,
             DelegationTokenManagerConfigs.CONFIG_DEF,
-            PasswordEncoderConfigs.CONFIG_DEF
+            PasswordEncoderConfigs.CONFIG_DEF,
+            ProducerMetricConfigs.CONFIG_DEF
         ));
     public AbstractKafkaConfig(ConfigDef definition, Map<?, ?> originals, Map<String, ?> configProviderProps, boolean doLog) {
         super(definition, originals, configProviderProps, doLog);

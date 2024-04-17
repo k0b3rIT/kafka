@@ -3625,6 +3625,9 @@ class ReplicaManagerTest {
 
     // verify that broker 1 did remove its metrics when no longer being the leader of partition 1
     verify(mockTopicStats1).removeOldLeaderMetrics(topic)
+    verify(mockTopicStats1, atLeastOnce()).removeOldLeaderMetrics(topic, 0)
+    verify(mockTopicStats1, atLeastOnce()).removeOldLeaderMetrics(topic, 1)
+    verify(mockTopicStats1, atLeastOnce()).removeOldFollowerMetrics(topic, 1)
   }
 
   @Test
@@ -3721,7 +3724,11 @@ class ReplicaManagerTest {
 
     // verify that broker 1 did remove its metrics when no longer being the leader of partition 1
     verify(mockTopicStats1).removeOldLeaderMetrics(topic)
+    verify(mockTopicStats1, atLeastOnce()).removeOldLeaderMetrics(topic, 0)
+    verify(mockTopicStats1, atLeastOnce()).removeOldLeaderMetrics(topic, 1)
     verify(mockTopicStats1).removeOldFollowerMetrics(topic)
+    verify(mockTopicStats1, atLeastOnce()).removeOldFollowerMetrics(topic, 0)
+    verify(mockTopicStats1, atLeastOnce()).removeOldFollowerMetrics(topic, 1)
   }
 
   private def prepareDifferentReplicaManagers(brokerTopicStats1: BrokerTopicStats,
@@ -4370,6 +4377,7 @@ class ReplicaManagerTest {
       replicaManager.becomeLeaderOrFollower(0, leaderAndIsrRequest, (_, _) => ())
 
       // Replicas fetch from the leader periodically, therefore we check that the metric value is increasing
+      assertTrue(brokerTopicStats.topicStats(tp0.topic(), tp0.partition()).buildRemoteLogAuxStateRequestRate.count > 0)
       assertTrue(brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count > 0)
       assertEquals(0, brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count)
       // Verify aggregate metrics
@@ -4426,6 +4434,10 @@ class ReplicaManagerTest {
       TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count > 0,
         "Should have buildRemoteLogAuxStateRequestRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count)
       TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count > 0,
+        "Should have failedBuildRemoteLogAuxStateRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count)
+      TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic(), tp0.partition()).buildRemoteLogAuxStateRequestRate.count > 0,
+        "Should have buildRemoteLogAuxStateRequestRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count)
+      TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic(), tp0.partition()).failedBuildRemoteLogAuxStateRate.count > 0,
         "Should have failedBuildRemoteLogAuxStateRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count)
       // Verify aggregate metrics
       TestUtils.waitUntilTrue(() => brokerTopicStats.allTopicsStats.buildRemoteLogAuxStateRequestRate.count > 0,
@@ -4484,6 +4496,10 @@ class ReplicaManagerTest {
       TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count > 0,
         "Should have buildRemoteLogAuxStateRequestRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count)
       TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count > 0,
+        "Should have failedBuildRemoteLogAuxStateRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count)
+      TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic(), tp0.partition()).buildRemoteLogAuxStateRequestRate.count > 0,
+        "Should have buildRemoteLogAuxStateRequestRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).buildRemoteLogAuxStateRequestRate.count)
+      TestUtils.waitUntilTrue(() => brokerTopicStats.topicStats(tp0.topic(), tp0.partition()).failedBuildRemoteLogAuxStateRate.count > 0,
         "Should have failedBuildRemoteLogAuxStateRate count > 0, but got:" + brokerTopicStats.topicStats(tp0.topic()).failedBuildRemoteLogAuxStateRate.count)
       // Verify aggregate metrics
       TestUtils.waitUntilTrue(() => brokerTopicStats.allTopicsStats.buildRemoteLogAuxStateRequestRate.count > 0,

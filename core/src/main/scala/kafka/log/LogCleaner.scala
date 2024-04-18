@@ -17,6 +17,8 @@
 
 package kafka.log
 
+import com.cloudera.kafka.log.MurmurOffsetMap
+
 import java.io.{File, IOException}
 import java.nio._
 import java.util.Date
@@ -32,7 +34,7 @@ import org.apache.kafka.common.record.MemoryRecords.RecordFilter
 import org.apache.kafka.common.record.MemoryRecords.RecordFilter.BatchRetention
 import org.apache.kafka.common.record._
 import org.apache.kafka.common.utils.{BufferSupplier, Time}
-import org.apache.kafka.server.config.ServerConfigs
+import org.apache.kafka.server.config.{ServerConfigs, ServerLogConfigs}
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 import org.apache.kafka.server.util.ShutdownableThread
 import org.apache.kafka.storage.internals.log.{AbortedTxn, CleanerConfig, LastRecord, LogDirFailureChannel, LogSegment, LogSegmentOffsetOverflowException, OffsetMap, SkimpyOffsetMap, TransactionIndex}
@@ -353,9 +355,15 @@ class LogCleaner(initialConfig: CleanerConfig,
     if (config.dedupeBufferSize / config.numThreads > Int.MaxValue)
       warn("Cannot use more than 2G of cleaner buffer space per cleaner thread, ignoring excess buffer space...")
 
+    val offsetMapMemory = math.min(config.dedupeBufferSize / config.numThreads, Int.MaxValue).toInt
+    val offsetMap = if (config.hashAlgorithm == ServerLogConfigs.CLOUDERA_LOG_CLEANER_HASHING_ALGORITHM_DEFAULT)
+      new MurmurOffsetMap(offsetMapMemory)
+    else
+      new SkimpyOffsetMap(math.min(config.dedupeBufferSize / config.numThreads, Int.MaxValue).toInt,
+        config.hashAlgorithm)
+
     val cleaner = new Cleaner(id = threadId,
-                              offsetMap = new SkimpyOffsetMap(math.min(config.dedupeBufferSize / config.numThreads, Int.MaxValue).toInt,
-                                                              config.hashAlgorithm),
+                              offsetMap = offsetMap,
                               ioBufferSize = config.ioBufferSize / config.numThreads / 2,
                               maxIoBufferSize = config.maxMessageSize,
                               dupBufferLoadFactor = config.dedupeBufferLoadFactor,
@@ -520,8 +528,8 @@ object LogCleaner {
       config.messageMaxBytes,
       config.logCleanerIoMaxBytesPerSecond,
       config.logCleanerBackoffMs,
-      config.logCleanerEnable)
-
+      config.logCleanerEnable,
+      config.clouderaLogCleanerHashingAlgorithm)
   }
 
   private val MaxBufferUtilizationPercentMetricName = "max-buffer-utilization-percent"

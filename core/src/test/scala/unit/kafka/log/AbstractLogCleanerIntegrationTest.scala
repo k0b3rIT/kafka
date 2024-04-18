@@ -131,7 +131,8 @@ abstract class AbstractLogCleanerIntegrationTest {
       maxMessageSize,
       Double.MaxValue,
       backoffMs,
-      true)
+      true,
+      CleanerConfig.HASH_ALGORITHM)
     new LogCleaner(cleanerConfig,
       logDirs = Array(logDir),
       logs = logMap,

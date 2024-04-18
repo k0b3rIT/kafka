@@ -17,6 +17,7 @@
 
 package kafka.log
 
+import com.cloudera.kafka.log.MurmurOffsetMap
 import kafka.common._
 import kafka.server.{BrokerTopicStats, KafkaConfig}
 import kafka.utils.{CoreUtils, Logging, Pool, TestUtils}
@@ -27,6 +28,7 @@ import org.apache.kafka.common.errors.CorruptRecordException
 import org.apache.kafka.common.record._
 import org.apache.kafka.common.utils.Utils
 import org.apache.kafka.coordinator.transaction.TransactionLogConfigs
+import org.apache.kafka.server.config.ServerLogConfigs
 import org.apache.kafka.server.metrics.{KafkaMetricsGroup, KafkaYammerMetrics}
 import org.apache.kafka.server.util.MockTime
 import org.apache.kafka.storage.internals.log.{AbortedTxn, AppendOrigin, CleanerConfig, LogAppendInfo, LogConfig, LogDirFailureChannel, LogFileUtils, LogSegment, LogSegments, LogStartOffsetIncrementReason, OffsetMap, ProducerStateManager, ProducerStateManagerConfig}
@@ -46,6 +48,7 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 import scala.collection._
 import scala.compat.java8.OptionConverters._
 import scala.jdk.CollectionConverters._
+import scala.util.Random
 
 /**
  * Unit tests for the log cleaning logic
@@ -2007,6 +2010,48 @@ class LogCleanerTest extends Logging {
     } finally {
       logCleaner.shutdown()
     }
+  }
+
+  @Test
+  def testCleanSegmentsWithMurmur(): Unit = {
+    val cleaner = makeCleaner(Int.MaxValue)
+    val logProps = new Properties()
+    logProps.put(ServerLogConfigs.LOG_SEGMENT_BYTES_CONFIG, 1024: java.lang.Integer)
+
+    val log = makeLog(config = LogConfig.fromProps(logConfig.originals, logProps))
+
+    // append messages to the log until we have four segments
+    val random = new Random()
+    val keys = Seq(1, 3, 5, 7, 9)
+    val latestValues = mutable.Map.empty[Int, Int]
+    while (log.numberOfSegments < 4) {
+      val key = keys(random.nextInt(keys.size))
+      val value = log.logEndOffset.toInt
+      latestValues.put(key, value)
+      log.appendAsLeader(record(key, value), leaderEpoch = 0)
+    }
+
+    // pretend we have the following keys
+    val map = new MurmurOffsetMap(1024)
+    cleaner.buildOffsetMap(log, log.logStartOffset, log.logEndOffset, map, new CleanerStats())
+
+    // clean the log
+    val segments = log.logSegments.asScala.take(3).toSeq
+    val stats = new CleanerStats()
+    val expectedBytesRead = segments.map(_.size).sum
+    cleaner.cleanSegments(log, segments, map, 0L, stats, new CleanedTransactionMetadata, -1)
+
+    assertEquals(latestValues, keysValuesInLog(log).map(f => f._1.toInt -> f._2.toInt))
+    assertEquals(expectedBytesRead, stats.bytesRead)
+  }
+
+  private def keysValuesInLog(log: UnifiedLog): Map[String, String] = {
+    {
+      for (logSegment <- log.logSegments.asScala;
+           batch <- logSegment.log.batches.asScala if !batch.isControlBatch;
+           record <- batch.asScala if record.hasValue && record.hasKey)
+      yield TestUtils.readString(record.key) -> TestUtils.readString(record.value)
+    }.toMap
   }
 
   private def writeToLog(log: UnifiedLog, keysAndValues: Iterable[(Int, Int)], offsetSeq: Iterable[Long]): Iterable[Long] = {

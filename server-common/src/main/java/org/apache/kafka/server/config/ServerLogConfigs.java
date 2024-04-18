@@ -106,6 +106,11 @@ public class ServerLogConfigs {
     public static final String LOG_PRE_ALLOCATE_CONFIG = ServerTopicConfigSynonyms.serverSynonym(TopicConfig.PREALLOCATE_CONFIG);
     public static final String LOG_PRE_ALLOCATE_ENABLE_DOC = "Should pre allocate file when create new segment? If you are using Kafka on Windows, you probably need to set it to true.";
 
+    public static final String CLOUDERA_LOG_CLEANER_HASHING_ALGORITHM_CONFIG = "cloudera.log.cleaner.hashing.algorithm";
+    public static final String CLOUDERA_LOG_CLEANER_HASHING_ALGORITHM_DEFAULT = "Murmur3";
+    public static final String CLOUDERA_LOG_CLEANER_HASHING_ALGORITHM_DOC = "Changes the hashing algorithm that is used for filtering keys during log " +
+        "compaction. This is an experimental Cloudera specific feature flag.";
+
     /* See `TopicConfig.MESSAGE_FORMAT_VERSION_CONFIG` for details */
     /**
      * @deprecated since "3.0"

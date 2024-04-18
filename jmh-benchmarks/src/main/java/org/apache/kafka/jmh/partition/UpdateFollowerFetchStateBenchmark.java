@@ -94,7 +94,7 @@ public class UpdateFollowerFetchStateBenchmark {
             setInitialOfflineDirs(Collections.emptyList()).
             setConfigRepository(new MockConfigRepository()).
             setInitialDefaultConfig(logConfig).
-            setCleanerConfig(new CleanerConfig(0, 0, 0, 0, 0, 0.0, 0, false)).
+            setCleanerConfig(new CleanerConfig(0, 0, 0, 0, 0, 0.0, 0, false, CleanerConfig.HASH_ALGORITHM)).
             setRecoveryThreadsPerDataDir(1).
             setFlushCheckMs(1000L).
             setFlushRecoveryOffsetCheckpointMs(10000L).

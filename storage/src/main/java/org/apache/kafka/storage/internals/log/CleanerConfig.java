@@ -32,7 +32,7 @@ import static org.apache.kafka.common.config.ConfigDef.Type.LONG;
  * Configuration parameters for the log cleaner.
  */
 public class CleanerConfig {
-    public static final String HASH_ALGORITHM = "MD5";
+    public static final String HASH_ALGORITHM = "Murmur3";
     public static final int LOG_CLEANER_THREADS = 1;
     public static final double LOG_CLEANER_IO_MAX_BYTES_PER_SECOND = Double.MAX_VALUE;
     public static final long LOG_CLEANER_DEDUPE_BUFFER_SIZE = 128 * 1024 * 1024L;
@@ -94,10 +94,11 @@ public class CleanerConfig {
     public final double maxIoBytesPerSecond;
     public final long backoffMs;
     public final boolean enableCleaner;
+    public final String hashAlgorithm;
 
     public CleanerConfig(boolean enableCleaner) {
         this(1, 4 * 1024 * 1024, 0.9, 1024 * 1024,
-            32 * 1024 * 1024, Double.MAX_VALUE, 15 * 1000, enableCleaner);
+            32 * 1024 * 1024, Double.MAX_VALUE, 15 * 1000, enableCleaner, HASH_ALGORITHM);
     }
 
     /**
@@ -118,7 +119,8 @@ public class CleanerConfig {
                          int maxMessageSize,
                          double maxIoBytesPerSecond,
                          long backoffMs,
-                         boolean enableCleaner) {
+                         boolean enableCleaner,
+                         String hashAlgorithm) {
         this.numThreads = numThreads;
         this.dedupeBufferSize = dedupeBufferSize;
         this.dedupeBufferLoadFactor = dedupeBufferLoadFactor;
@@ -127,9 +129,10 @@ public class CleanerConfig {
         this.maxIoBytesPerSecond = maxIoBytesPerSecond;
         this.backoffMs = backoffMs;
         this.enableCleaner = enableCleaner;
+        this.hashAlgorithm = hashAlgorithm;
     }
 
     public String hashAlgorithm() {
-        return HASH_ALGORITHM;
+        return hashAlgorithm;
     }
 }

@@ -1082,6 +1082,7 @@ class KafkaConfigTest {
         // Cloudera configs
         case ProducerMetricConfigs.PRODUCER_WHITELIST_ENABLED_CONFIG => // ignore
         case ProducerMetricConfigs.PRODUCER_WHITELIST_CONFIG => // ignore
+        case ServerLogConfigs.CLOUDERA_LOG_CLEANER_HASHING_ALGORITHM_CONFIG => // ignore
 
         //Kafka Yammer metrics reporter configs
         case MetricConfigs.KAFKA_METRICS_REPORTER_CLASSES_CONFIG => // ignore

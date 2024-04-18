@@ -275,7 +275,8 @@ class LogCleanerParameterizedIntegrationTest extends AbstractLogCleanerIntegrati
       cleaner.currentConfig.maxMessageSize,
       cleaner.currentConfig.maxIoBytesPerSecond,
       cleaner.currentConfig.backoffMs,
-      true))
+      true,
+      CleanerConfig.HASH_ALGORITHM))
     cleaner.reconfigure(oldConfig, newConfig)
 
     assertEquals(2, cleaner.cleanerCount)

@@ -21,6 +21,8 @@ package com.cloudera.kafka.connect.rest.authorization.extension;
 import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
 import org.apache.kafka.connect.runtime.rest.entities.ConfigInfos;
 import org.apache.kafka.connect.runtime.rest.entities.ConfigKeyInfo;
+import org.apache.kafka.connect.runtime.rest.entities.ConnectorOffset;
+import org.apache.kafka.connect.runtime.rest.entities.ConnectorOffsets;
 import org.apache.kafka.connect.runtime.rest.entities.CreateConnectorRequest;
 import org.apache.kafka.connect.runtime.rest.entities.ServerInfo;
 import org.apache.kafka.connect.runtime.rest.resources.ConnectorPluginsResource;
@@ -437,6 +439,28 @@ public class ConnectAuthorizationFilterIntegrationTest {
     }
 
     @Test
+    public void testGetOffsetRequestSuccess() throws Throwable {
+        ConnectorsResource resource = mock(ConnectorsResource.class);
+        HttpGet request = createGetOffsetsRequest(resource, true);
+
+        HttpResponse response = TestUtils.execute(request);
+
+        verify(authorizer, resource, principal);
+        assertEquals(200, response.getStatusLine().getStatusCode());
+    }
+
+    @Test
+    public void testGetOffsetRequestNotFound() throws Throwable {
+        ConnectorsResource resource = mock(ConnectorsResource.class);
+        HttpGet request = createGetOffsetsRequest(resource, false);
+
+        HttpResponse response = TestUtils.execute(request);
+
+        verify(authorizer, resource, principal);
+        assertEquals(404, response.getStatusLine().getStatusCode());
+    }
+
+    @Test
     public void testHealthEndpointWithoutAuth() throws Throwable {
         verifyHealthEndpointWithUser("ANONYMOUS");
     }
@@ -576,6 +600,24 @@ public class ConnectAuthorizationFilterIntegrationTest {
         restServer.initializeResources(Arrays.asList(resource, authenticator, filter));
         replay(resource, authorizer, principal);
         return TestUtils.createHttpGetRequest(restServer.serverBaseUrl(), "/connector-plugins/cp/config");
+    }
+
+    private HttpGet createGetOffsetsRequest(ConnectorsResource resource, boolean isAuthorized) throws Throwable {
+        AuthorizableAction action = new AuthorizableAction(connectorResource("1"), Operation.VIEW, true, true);
+
+        expect(principal.getName()).andReturn(NORMAL_USER).anyTimes();
+        expect(authorizer.isAuthorized(principal, action)).andReturn(isAuthorized);
+        if (isAuthorized) {
+            ConnectorOffsets offsets = new ConnectorOffsets(Arrays.asList(
+                    new ConnectorOffset(Collections.singletonMap("partitionKey", "partitionValue"), Collections.singletonMap("offsetKey", "offsetValue")),
+                    new ConnectorOffset(Collections.singletonMap("partitionKey", "partitionValue2"), Collections.singletonMap("offsetKey", "offsetValue"))
+            ));
+            expect(resource.getOffsets(anyString())).andReturn(offsets);
+        }
+
+        restServer.initializeResources(Arrays.asList(resource, authenticator, filter));
+        replay(resource, authorizer, principal);
+        return TestUtils.createHttpGetRequest(restServer.serverBaseUrl(), "/connectors/1/offsets");
     }
 
     @Provider

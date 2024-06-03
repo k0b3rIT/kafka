@@ -93,13 +93,14 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
     private static final Pattern CONNECTOR_STATUS_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/status[/]?");
     private static final Pattern CONNECTOR_TOPICS_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/topics[/]?");
     private static final Pattern CONNECTOR_TOPICS_RESET_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/topics/reset[/]?");
-    private static final Pattern CONNECTOR_MANAGE_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/(pause|resume)[/]?");
+    private static final Pattern CONNECTOR_MANAGE_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/(pause|resume|stop)[/]?");
     private static final Pattern CONNECTOR_RESTART_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/restart[/]?");
     private static final Pattern CONNECTOR_TASK_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/tasks[/]?");
     private static final Pattern CONNECTOR_TASK_STATUS_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/tasks/[^/]+/status[/]?");
     private static final Pattern CONNECTOR_TASK_RESTART_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/tasks/[^/]+/restart[/]?");
     private static final Pattern CONNECTOR_PERMISSIONS_REQUEST_PATTERN = Pattern.compile("^connector-permissions[/]?");
     private static final Pattern CONNECTOR_FENCE_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/fence[/]?");
+    private static final Pattern CONNECTOR_OFFSET_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/offsets[/]?");
     private static final Pattern CONNECTOR_HEALTH_CHECK_REQUEST_PATTERN = Pattern.compile("^health$");
 
     private static final List<AuthorizationMapping> AUTHORIZATION_MAPPINGS;
@@ -125,6 +126,9 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
         mappings.add(new AuthorizationMapping(HttpMethod.GET, CONNECTOR_TASK_STATUS_REQUEST_PATTERN, ResourceType.CONNECTOR, new StaticOperationMapper(Operation.VIEW)));
         mappings.add(new AuthorizationMapping(HttpMethod.POST, CONNECTOR_TASK_RESTART_REQUEST_PATTERN, ResourceType.CONNECTOR, new StaticOperationMapper(Operation.MANAGE)));
         mappings.add(new AuthorizationMapping(HttpMethod.GET, CONNECTOR_PLUGIN_CONFIG_REQUEST_PATTERN, ResourceType.CLUSTER, new StaticOperationMapper(Operation.VIEW)));
+        mappings.add(new AuthorizationMapping(HttpMethod.GET, CONNECTOR_OFFSET_REQUEST_PATTERN, ResourceType.CONNECTOR, new StaticOperationMapper(Operation.VIEW)));
+        mappings.add(new AuthorizationMapping(HttpMethod.PATCH, CONNECTOR_OFFSET_REQUEST_PATTERN, ResourceType.CONNECTOR, new StaticOperationMapper(Operation.EDIT)));
+        mappings.add(new AuthorizationMapping(HttpMethod.DELETE, CONNECTOR_OFFSET_REQUEST_PATTERN, ResourceType.CONNECTOR, new StaticOperationMapper(Operation.DELETE)));
         AUTHORIZATION_MAPPINGS = Collections.unmodifiableList(mappings);
     }
 

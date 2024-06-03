@@ -70,14 +70,13 @@ public class ConnectAuthorizationFilterTest {
     private static final Set<String> SUPER_USER_PRINCIPAL_NAMES = Collections.singleton(SUPER_USER_PRINCIPAL_NAME);
 
     private Principal principalMock;
-    private ConnectClusterState clusterStateMock;
     private ConnectAuthorizer authorizer;
     private ConnectAuthorizationFilter connectAuthorizationFilter;
 
     @BeforeEach
     public void setup() {
         principalMock = mock(Principal.class);
-        clusterStateMock = mock(ConnectClusterState.class);
+        ConnectClusterState clusterStateMock = mock(ConnectClusterState.class);
         expect(clusterStateMock.connectors()).andReturn(Collections.singletonList("connector-1")).anyTimes();
         replay(clusterStateMock);
         authorizer = mock(ConnectAuthorizer.class);
@@ -258,7 +257,7 @@ public class ConnectAuthorizationFilterTest {
     @Test
     public void testRootSuccessWithAnonymousUser() {
         ContainerRequestContext requestContext = getMockRequest(HttpMethod.GET, "", false, false, ConnectAuthorizer.ANONYMOUS_PRINCIPAL_NAME);
-        setupSimpleMockAuthorizer(clusterResource(), Operation.VIEW, true, ConnectAuthorizer.ANONYMOUS_PRINCIPAL_NAME);
+        setupSimpleMockAuthorizer(clusterResource());
 
         connectAuthorizationFilter.filter(requestContext);
 
@@ -693,7 +692,7 @@ public class ConnectAuthorizationFilterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"pause", "resume"})
+    @ValueSource(strings = {"pause", "resume", "stop"})
     public void testConnectorManageSuccess(String pathEnd) {
         ContainerRequestContext requestContext = getMockRequest(HttpMethod.PUT, "connectors/1/" + pathEnd,
             false, false);
@@ -708,7 +707,7 @@ public class ConnectAuthorizationFilterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"pause", "resume"})
+    @ValueSource(strings = {"pause", "resume", "stop"})
     public void testConnectorManageNoPermission(String pathEnd) {
         ContainerRequestContext requestContext = getMockRequest(HttpMethod.PUT, "connectors/1/" + pathEnd,
             true, false);
@@ -919,6 +918,98 @@ public class ConnectAuthorizationFilterTest {
         verify(requestContext);
     }
 
+    @Test
+    public void testGetConnectorOffsetsSuccess() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.GET, "connectors/1/offsets", false, false);
+        setupSimpleMockAuthorizer(connectorResource("1"), true);
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @Test
+    public void testGetConnectorOffsetsNoPermission() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.GET, "connectors/1/offsets", true, false);
+        setupSimpleMockAuthorizer(connectorResource("1"), false);
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @Test
+    public void testPatchConnectorOffsetsSuccess() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.PATCH, "connectors/connector-1/offsets", false, false);
+        Set<AuthorizableAction> actions = new HashSet<>(Arrays.asList(
+                new AuthorizableAction(connectorResource("connector-1"), Operation.VIEW, false, false),
+                new AuthorizableAction(connectorResource("connector-1"), Operation.EDIT)));
+        setupComplexMockAuthorizer(actions, actions);
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @Test
+    public void testPatchConnectorOffsetsWithSuperUser() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.PATCH, "connectors/1/offsets", false, false, true);
+        replay(authorizer);
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @Test
+    public void testPatchConnectorOffsetsNoPermission() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.PATCH, "connectors/connector-1/offsets", true, false);
+        Set<AuthorizableAction> actions = new HashSet<>(Arrays.asList(
+                new AuthorizableAction(connectorResource("connector-1"), Operation.VIEW, false, false),
+                new AuthorizableAction(connectorResource("connector-1"), Operation.EDIT)));
+        setupComplexMockAuthorizer(actions, Collections.emptySet());
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @Test
+    public void testDeleteConnectorOffsetsSuccess() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.DELETE, "connectors/1/offsets", false, false);
+        Set<AuthorizableAction> actions = new HashSet<>(Arrays.asList(
+                new AuthorizableAction(connectorResource("1"), Operation.VIEW, false, false),
+                new AuthorizableAction(connectorResource("1"), Operation.DELETE)));
+        setupComplexMockAuthorizer(actions, actions);
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @Test
+    public void testDeleteConnectorOffsetsNoPermission() {
+        ContainerRequestContext requestContext = getMockRequest(HttpMethod.DELETE, "connectors/1/offsets", true, false);
+        Set<AuthorizableAction> actions = new HashSet<>(Arrays.asList(
+                new AuthorizableAction(connectorResource("1"), Operation.VIEW, false, false),
+                new AuthorizableAction(connectorResource("1"), Operation.DELETE)));
+        setupComplexMockAuthorizer(actions, Collections.emptySet());
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(authorizer, requestContext);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {HttpMethod.POST, HttpMethod.PUT, HttpMethod.OPTIONS, HttpMethod.HEAD})
+    public void testConnectorOffsetsWrongHttpMethodError(String method) {
+        ContainerRequestContext requestContext = getMockRequest(method, "connectors/1/offsets", true, false);
+
+        connectAuthorizationFilter.filter(requestContext);
+
+        verify(requestContext);
+    }
+
     private void setupSimpleMockAuthorizer(Resource resource, boolean isAuthorized) {
         setupSimpleMockAuthorizer(resource, Operation.VIEW, isAuthorized);
     }
@@ -928,8 +1019,13 @@ public class ConnectAuthorizationFilterTest {
         replay(authorizer);
     }
 
-    private void setupSimpleMockAuthorizer(Resource resource, Operation operation, boolean isAuthorized, String principalName) {
-        expect(authorizer.isAuthorized(principalNameMatcher(principalName), eq(new AuthorizableAction(resource, operation)))).andReturn(isAuthorized);
+    private void setupSimpleMockAuthorizer(Resource resource) {
+        expect(
+                authorizer.isAuthorized(
+                        principalNameMatcher(ConnectAuthorizer.ANONYMOUS_PRINCIPAL_NAME),
+                        eq(new AuthorizableAction(resource, Operation.VIEW))
+                )
+        ).andReturn(true);
         replay(authorizer);
     }
 
@@ -943,7 +1039,7 @@ public class ConnectAuthorizationFilterTest {
 
                     @Override
                     public void appendTo(StringBuffer buffer) {
-                        buffer.append("Principal(name=").append(principalName).append(")");
+                        buffer.append("Principal(name=").append(principalName).append(')');
                     }
                 }
         );

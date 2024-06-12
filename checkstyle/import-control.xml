@@ -584,7 +584,9 @@
       <allow pkg="org.apache.kafka.connect.util" />
       <allow pkg="org.apache.kafka.connect.converters" />
       <allow pkg="org.apache.kafka.connect.json" />
+      <allow pkg="org.apache.kafka.connect.rest" />
       <allow pkg="net.sourceforge.argparse4j" />
+      <allow pkg="com.cloudera.kafka" />
       <!-- for tests -->
       <allow pkg="org.apache.kafka.connect.integration" />
       <allow pkg="org.apache.kafka.connect.mirror" />

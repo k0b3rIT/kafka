@@ -125,6 +125,7 @@ public class DedicatedMirrorIntegrationTest {
             throw new IllegalStateException("No MirrorMaker named " + name + " has been started");
         }
         mirror.stop();
+        mirror.awaitStop();
     }
 
     /**
@@ -165,6 +166,8 @@ public class DedicatedMirrorIntegrationTest {
                     put("offset.storage.replication.factor", "1");
                     put("status.storage.replication.factor", "1");
                     put("config.storage.replication.factor", "1");
+                    put("mm.replication.restart.count", "5");
+                    put("mm.replication.restart.delay.ms", "10000");
                 }};
 
             // Bring up a single-node cluster
@@ -321,6 +324,8 @@ public class DedicatedMirrorIntegrationTest {
                     // For the multi-node case, we wait for reassignment so shorten the delay period.
                     put(a + "." + DistributedConfig.SCHEDULED_REBALANCE_MAX_DELAY_MS_CONFIG, "1000");
                     put(b + "." + DistributedConfig.SCHEDULED_REBALANCE_MAX_DELAY_MS_CONFIG, "1000");
+                    put("mm.replication.restart.count", "5");
+                    put("mm.replication.restart.delay.ms", "5000");
                 }};
 
             final SourceAndTarget sourceAndTarget = new SourceAndTarget(a, b);
@@ -366,6 +371,7 @@ public class DedicatedMirrorIntegrationTest {
                 awaitConnectorTasksStart(any, MirrorHeartbeatConnector.class, sourceAndTarget);
                 awaitConnectorTasksStart(any, MirrorSourceConnector.class, sourceAndTarget);
                 startMirrorMaker("node " + i, newMmProps);
+                awaitMirrorMakerStart(mirrorMakers.get("node " + i), sourceAndTarget);
             }
             // Assert that the new configuration is propagated
             awaitTaskConfigurations(mirrorMakers.get("node 0"), MirrorSourceConnector.class, sourceAndTarget,
@@ -433,13 +439,12 @@ public class DedicatedMirrorIntegrationTest {
                         .allMatch(predicate);
             } catch (ExecutionException ex) {
                 if (ex.getCause() instanceof RebalanceNeededException) {
-                    // RebalanceNeededException should be retriable
-                    // This happens when a worker has read a new config from the config topic, but hasn't completed the
-                    // subsequent rebalance yet
-                    throw ex;
+                    log.warn("Rebalance needed for connector {} for mirror maker with source->target={}", connName, sourceAndTarget, ex);
+                    return false;
+                } else {
+                    log.error("Something unexpected occurred. Unable to get configuration of connector {} for mirror maker with source->target={}", connName, sourceAndTarget, ex);
+                    throw new NoRetryException(ex);
                 }
-                log.error("Something unexpected occurred. Unable to get configuration of connector {} for mirror maker with source->target={}", connName, sourceAndTarget, ex);
-                throw new NoRetryException(ex);
             }
         }, MM_START_UP_TIMEOUT_MS, "Connector configuration for " + connName + " for MirrorMaker instances is incorrect");
     }

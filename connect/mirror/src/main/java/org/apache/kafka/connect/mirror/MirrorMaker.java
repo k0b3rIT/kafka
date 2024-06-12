@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.connect.mirror;
 
+import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.utils.Exit;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
@@ -24,8 +25,11 @@ import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePo
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.mirror.rest.MirrorRestServer;
+import org.apache.kafka.connect.rest.ConnectRestExtension;
+import org.apache.kafka.connect.runtime.AbstractStatus;
 import org.apache.kafka.connect.runtime.Herder;
 import org.apache.kafka.connect.runtime.Worker;
+import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.WorkerConfigTransformer;
 import org.apache.kafka.connect.runtime.distributed.DistributedConfig;
 import org.apache.kafka.connect.runtime.isolation.Plugins;
@@ -42,6 +46,9 @@ import org.apache.kafka.connect.util.Callback;
 import org.apache.kafka.connect.util.ConnectUtils;
 import org.apache.kafka.connect.util.SharedTopicAdmin;
 
+import com.cloudera.kafka.connect.mirror.FlowLifecycle;
+import com.cloudera.kafka.connect.mirror.MirrorMakerMetrics;
+
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
@@ -52,6 +59,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -108,7 +116,7 @@ public class MirrorMaker {
             MirrorHeartbeatConnector.class,
             MirrorCheckpointConnector.class));
 
-    private final Map<SourceAndTarget, Herder> herders = new HashMap<>();
+    private final Map<SourceAndTarget, Herder> startedHerders = new HashMap<>();
     private CountDownLatch startLatch;
     private CountDownLatch stopLatch;
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
@@ -117,8 +125,14 @@ public class MirrorMaker {
     private final Time time;
     private final MirrorMakerConfig config;
     private final Set<String> clusters;
+
+    private final Set<SourceAndTarget> flows;
     private final MirrorRestServer internalServer;
     private final RestClient restClient;
+
+    private final Map<SourceAndTarget, Map<String, String>> workerConfigMap = new HashMap<>();
+    private final Map<SourceAndTarget, DistributedConfig>  distributedConfigMap = new HashMap<>();
+    private final MirrorMakerStarter mmStarter;
 
     /**
      * @param config    MM2 configuration from mm2.properties file
@@ -148,13 +162,22 @@ public class MirrorMaker {
             this.clusters = config.clusters();
         }
         log.info("Targeting clusters {}", this.clusters);
-        Set<SourceAndTarget> herderPairs = config.clusterPairs().stream()
+        this.flows = config.clusterPairs().stream()
             .filter(x -> this.clusters.contains(x.target()))
             .collect(Collectors.toSet());
-        if (herderPairs.isEmpty()) {
+        if (flows.isEmpty()) {
             throw new IllegalArgumentException("No source->target replication flows.");
         }
-        herderPairs.forEach(this::addHerder);
+        this.flows.forEach(sourceAndTarget -> {
+            Map<String, String> workerProps = config.workerConfig(sourceAndTarget);
+            Plugins plugins = new Plugins(workerProps);
+            plugins.compareAndSwapWithDelegatingLoader();
+
+            workerConfigMap.put(sourceAndTarget, workerProps);
+            distributedConfigMap.put(sourceAndTarget, new DistributedConfig(workerProps));
+        });
+
+        mmStarter = new MirrorMakerStarter();
         shutdownHook = new ShutdownHook();
     }
 
@@ -179,23 +202,18 @@ public class MirrorMaker {
 
 
     public void start() {
-        log.info("Kafka MirrorMaker starting with {} herders.", herders.size());
+        log.info("Kafka MirrorMaker starting with {} herders.", flows.size());
         if (startLatch != null) {
             throw new IllegalStateException("MirrorMaker instance already started");
         }
-        startLatch = new CountDownLatch(herders.size());
-        stopLatch = new CountDownLatch(herders.size());
+        startLatch = new CountDownLatch(flows.size());
+        stopLatch = new CountDownLatch(flows.size());
         Exit.addShutdownHook("mirror-maker-shutdown-hook", shutdownHook);
-        for (Herder herder : herders.values()) {
-            try {
-                herder.start();
-            } finally {
-                startLatch.countDown();
-            }
-        }
+        mmStarter.start(flows, this::onFlowStarted);
+
         if (internalServer != null) {
             log.info("Initializing internal REST resources");
-            internalServer.initializeInternalResources(herders);
+            internalServer.initializeInternalResources(startedHerders);
         }
         log.info("Configuring connectors will happen once the worker joins the group as a leader");
         log.info("Kafka MirrorMaker started");
@@ -208,15 +226,13 @@ public class MirrorMaker {
             if (internalServer != null) {
                 Utils.closeQuietly(internalServer::stop, "Internal REST server");
             }
-            for (Herder herder : herders.values()) {
-                try {
-                    herder.stop();
-                } finally {
-                    stopLatch.countDown();
-                }
-            }
+            mmStarter.stop();
             log.info("Kafka MirrorMaker stopped.");
         }
+    }
+
+    private void onFlowStarted(SourceAndTarget sourceAndTarget, Herder herder) {
+        startedHerders.put(sourceAndTarget, herder);
     }
 
     public void awaitStop() {
@@ -228,14 +244,13 @@ public class MirrorMaker {
     }
 
     private void checkHerder(SourceAndTarget sourceAndTarget) {
-        if (!herders.containsKey(sourceAndTarget)) {
+        if (!flows.contains(sourceAndTarget)) {
             throw new IllegalArgumentException("No herder for " + sourceAndTarget.toString());
         }
     }
 
-    private void addHerder(SourceAndTarget sourceAndTarget) {
+    private Herder createHerder(SourceAndTarget sourceAndTarget) {
         log.info("creating herder for " + sourceAndTarget.toString());
-        Map<String, String> workerProps = config.workerConfig(sourceAndTarget);
         List<String> restNamespace;
         try {
             String encodedSource = encodePath(sourceAndTarget.source());
@@ -245,9 +260,9 @@ public class MirrorMaker {
             throw new RuntimeException("Unable to create encoded URL paths for source and target using UTF-8", e);
         }
         String workerId = sourceAndTarget.toString();
-        Plugins plugins = new Plugins(workerProps);
+        Plugins plugins = new Plugins(workerConfigMap.get(sourceAndTarget));
         plugins.compareAndSwapWithDelegatingLoader();
-        DistributedConfig distributedConfig = new DistributedConfig(workerProps);
+        DistributedConfig distributedConfig = distributedConfigMap.get(sourceAndTarget);
         String kafkaClusterId = distributedConfig.kafkaClusterId();
         String clientIdBase = ConnectUtils.clientIdBase(distributedConfig);
         // Create the admin client to be shared by all backing stores for this herder
@@ -279,7 +294,7 @@ public class MirrorMaker {
                 kafkaClusterId, statusBackingStore, configBackingStore,
                 advertisedUrl, restClient, clientConfigOverridePolicy,
                 restNamespace, sharedAdmin);
-        herders.put(sourceAndTarget, herder);
+        return herder;
     }
 
     private static String encodePath(String rawPath) throws UnsupportedEncodingException {
@@ -312,12 +327,17 @@ public class MirrorMaker {
 
     public ConnectorStateInfo connectorStatus(SourceAndTarget sourceAndTarget, String connector) {
         checkHerder(sourceAndTarget);
-        return herders.get(sourceAndTarget).connectorStatus(connector);
+        Herder herder = startedHerders.get(sourceAndTarget);
+        if (herder == null) {
+            return new ConnectorStateInfo(connector, new ConnectorStateInfo.ConnectorState(AbstractStatus.State.UNASSIGNED.toString(), null, null), Collections.emptyList(), null);
+        } else {
+            return startedHerders.get(sourceAndTarget).connectorStatus(connector);
+        }
     }
 
     public void taskConfigs(SourceAndTarget sourceAndTarget, String connector, Callback<List<TaskInfo>> cb) {
         checkHerder(sourceAndTarget);
-        herders.get(sourceAndTarget).taskConfigs(connector, cb);
+        startedHerders.get(sourceAndTarget).taskConfigs(connector, cb);
     }
 
     public static void main(String[] args) {
@@ -358,6 +378,80 @@ public class MirrorMaker {
         } catch (Throwable t) {
             log.error("Stopping due to error", t);
             Exit.exit(2);
+        }
+    }
+
+    public class MirrorMakerStarter {
+        private static final String JMX_JSON_METRICS_REST_EXTENSION =
+                "com.cloudera.dim.kafka.metrics.JmxJsonMetricsRestExtension";
+        private final int maxTries;
+        private final long delayMs;
+        private final Map<SourceAndTarget, FlowLifecycle> starters;
+        private final MirrorMakerMetrics metrics;
+        private ConnectRestExtension jmxJsonRestExtension;
+
+
+        private MirrorMakerStarter() {
+            this.metrics = new MirrorMakerMetrics(config);
+            this.maxTries = config.getInt(MirrorMakerConfig.HERDER_RESTART_NUM_CONFIG);
+            this.delayMs = config.getLong(MirrorMakerConfig.HERDER_RESTART_DELAY_CONFIG);
+            starters = new HashMap<>();
+        }
+
+        public Herder createHerder(SourceAndTarget sourceAndTarget) {
+            return MirrorMaker.this.createHerder(sourceAndTarget);
+        }
+
+        synchronized void start(Set<SourceAndTarget> flows, KafkaFuture.BiConsumer<SourceAndTarget, Herder> onFlowStarted) {
+            if (config.getBoolean(MirrorMakerConfig.MM_METRICS_SERVLET_ENABLE) &&
+                    config.originalsStrings().containsKey(WorkerConfig.PLUGIN_PATH_CONFIG)) {
+                initMetricsServlet();
+            } else {
+                log.warn("Not starting metrics servlet, because either metrics servlet is not enabled or plugin.path is not configured.");
+            }
+            flows.forEach(sourceAndTarget -> {
+                startFlow(sourceAndTarget, (sat, h) -> {
+                    if (internalServer != null) {
+                        metrics.herderUrl(sat.toString(), MirrorMaker.this.internalServer.advertisedUrl().toString());
+                    }
+                    onFlowStarted.accept(sat, h);
+                });
+            });
+        }
+
+        synchronized void stop() {
+            starters.values().forEach(FlowLifecycle::stop);
+
+            // stopping metrics
+            stopMetricsServlet();
+            metrics.close();
+        }
+
+        private void startFlow(SourceAndTarget sourceAndTarget, KafkaFuture.BiConsumer<SourceAndTarget, Herder> onFlowStarted) {
+            FlowLifecycle starter = new FlowLifecycle(sourceAndTarget, this, metrics, startLatch, stopLatch,
+                    maxTries, delayMs);
+            starters.put(sourceAndTarget, starter);
+            starter.start(onFlowStarted);
+        }
+
+        private void initMetricsServlet() {
+            Plugins plugins = new Plugins(config.originalsStrings());
+            plugins.compareAndSwapWithDelegatingLoader();
+            jmxJsonRestExtension = plugins.newPlugin(JMX_JSON_METRICS_REST_EXTENSION, config, ConnectRestExtension.class);
+
+            // This specific Rest Extension does not use the passed context
+            jmxJsonRestExtension.register(null);
+        }
+
+        private void stopMetricsServlet() {
+            try {
+                if (jmxJsonRestExtension != null) {
+                    jmxJsonRestExtension.close();
+                }
+            } catch (IOException e) {
+                // should never really be thrown
+                log.error("Unexpected IOException during stopping metrics servlet.", e);
+            }
         }
     }
 

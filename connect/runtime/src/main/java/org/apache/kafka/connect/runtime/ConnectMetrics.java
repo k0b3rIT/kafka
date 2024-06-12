@@ -28,6 +28,7 @@ import org.apache.kafka.common.metrics.MetricsReporter;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.internals.MetricsUtils;
 import org.apache.kafka.common.utils.AppInfoParser;
+import org.apache.kafka.common.utils.Sanitizer;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.runtime.distributed.DistributedConfig;
 
@@ -72,7 +73,7 @@ public class ConnectMetrics {
     public ConnectMetrics(String workerId, WorkerConfig config, Time time, String clusterId) {
         this.workerId = workerId;
         this.time = time;
-        registry = new ConnectMetricsRegistry(config.getString(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG));
+        registry = new ConnectMetricsRegistry(Sanitizer.sanitize(config.getString(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG)));
 
         int numSamples = config.getInt(CommonClientConfigs.METRICS_NUM_SAMPLES_CONFIG);
         long sampleWindowMs = config.getLong(CommonClientConfigs.METRICS_SAMPLE_WINDOW_MS_CONFIG);

@@ -66,6 +66,17 @@ public class MirrorMakerConfig extends AbstractConfig {
     public static final String CONFIG_PROVIDERS_CONFIG = WorkerConfig.CONFIG_PROVIDERS_CONFIG;
     private static final String CONFIG_PROVIDERS_DOC = "Names of ConfigProviders to use.";
 
+    public static final String MM_METRICS_SERVLET_ENABLE = "mm.metrics.servlet.enable";
+    private static final String MM_METRICS_SERVLET_ENABLE_DOC = "Enable the metrics servlet for MM2";
+    private static final Boolean MM_METRICS_SERVLET_ENABLE_DEFAULT = Boolean.FALSE;
+
+    public static final String HERDER_RESTART_NUM_CONFIG = "mm.replication.restart.count";
+    private static final String HERDER_RESTART_NUM_DOC = "The number of times, the failing start of a replication flow is attempted. (-1 means no upper limit)";
+    private static final Integer HERDER_RESTART_NUM_DEFAULT = 1;
+    public static final String HERDER_RESTART_DELAY_CONFIG = "mm.replication.restart.delay.ms";
+    private static final String HERDER_RESTART_DELAY_DOC = "The delay in ms between two replication flow restart attempts.";
+    private static final Long HERDER_RESTART_DELAY_DEFAULT = 5000L;
+
     private static final String NAME = "name";
     private static final String CONNECTOR_CLASS = "connector.class";
     private static final String SOURCE_CLUSTER_ALIAS = "source.cluster.alias";
@@ -317,6 +328,21 @@ public class MirrorMakerConfig extends AbstractConfig {
                         in(Utils.enumOptions(SecurityProtocol.class)),
                         Importance.MEDIUM,
                         CommonClientConfigs.SECURITY_PROTOCOL_DOC)
+                .define(MM_METRICS_SERVLET_ENABLE,
+                        Type.BOOLEAN,
+                        MM_METRICS_SERVLET_ENABLE_DEFAULT,
+                        Importance.LOW,
+                        MM_METRICS_SERVLET_ENABLE_DOC)
+                .define(HERDER_RESTART_NUM_CONFIG,
+                        Type.INT,
+                        HERDER_RESTART_NUM_DEFAULT,
+                        Importance.LOW,
+                        HERDER_RESTART_NUM_DOC)
+                .define(HERDER_RESTART_DELAY_CONFIG,
+                        Type.LONG,
+                        HERDER_RESTART_DELAY_DEFAULT,
+                        Importance.LOW,
+                        HERDER_RESTART_DELAY_DOC)
                 .withClientSslSupport()
                 .withClientSaslSupport();
         RestServerConfig.addInternalConfig(result);

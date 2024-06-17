@@ -234,7 +234,7 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
 
         super(id, statusListener, initialState, loader, connectMetrics, errorMetrics,
                 retryWithToleranceOperator, transformationChain, errorReportersSupplier,
-                time, statusBackingStore);
+                time, statusBackingStore, workerConfig.contextPrefix());
 
         this.workerConfig = workerConfig;
         this.task = task;

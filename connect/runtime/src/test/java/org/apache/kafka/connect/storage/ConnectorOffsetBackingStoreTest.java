@@ -83,7 +83,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-                () -> LoggingContext.forConnector("source-connector"),
+                () -> LoggingContext.forConnector("source-connector", ""),
                 workerStore,
                 connectorStore,
                 "offsets-topic",
@@ -116,7 +116,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-                () -> LoggingContext.forConnector("source-connector"),
+                () -> LoggingContext.forConnector("source-connector", ""),
                 workerStore,
                 connectorStore,
                 "offsets-topic",
@@ -151,7 +151,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-                () -> LoggingContext.forConnector("source-connector"),
+                () -> LoggingContext.forConnector("source-connector", ""),
                 workerStore,
                 connectorStore,
                 "offsets-topic",
@@ -187,7 +187,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-            () -> LoggingContext.forConnector("source-connector"),
+            () -> LoggingContext.forConnector("source-connector", ""),
             workerStore,
             connectorStore,
             "offsets-topic",
@@ -220,7 +220,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-                () -> LoggingContext.forConnector("source-connector"),
+                () -> LoggingContext.forConnector("source-connector", ""),
                 workerStore,
                 connectorStore,
                 "offsets-topic",
@@ -251,7 +251,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore connectorStore = createStore("topic1", connectorStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withOnlyConnectorStore(
-                () -> LoggingContext.forConnector("source-connector"),
+                () -> LoggingContext.forConnector("source-connector", ""),
                 connectorStore,
                 "offsets-topic",
                 mock(TopicAdmin.class));
@@ -277,7 +277,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore connectorStore = createStore("topic1", connectorStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withOnlyConnectorStore(
-            () -> LoggingContext.forConnector("source-connector"),
+            () -> LoggingContext.forConnector("source-connector", ""),
             connectorStore,
             "offsets-topic",
             mock(TopicAdmin.class));
@@ -305,7 +305,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-            () -> LoggingContext.forConnector("source-connector"),
+            () -> LoggingContext.forConnector("source-connector", ""),
             workerStore,
             connectorStore,
             "offsets-topic",
@@ -335,7 +335,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-            () -> LoggingContext.forConnector("source-connector"),
+            () -> LoggingContext.forConnector("source-connector", ""),
             workerStore,
             connectorStore,
             "offsets-topic",
@@ -364,7 +364,7 @@ public class ConnectorOffsetBackingStoreTest {
         KafkaOffsetBackingStore workerStore = createStore("topic2", workerStoreProducer);
 
         ConnectorOffsetBackingStore offsetBackingStore = ConnectorOffsetBackingStore.withConnectorAndWorkerStores(
-            () -> LoggingContext.forConnector("source-connector"),
+            () -> LoggingContext.forConnector("source-connector", ""),
             workerStore,
             connectorStore,
             "offsets-topic",

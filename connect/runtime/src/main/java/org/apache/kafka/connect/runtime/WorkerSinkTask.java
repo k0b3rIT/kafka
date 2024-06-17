@@ -123,7 +123,7 @@ class WorkerSinkTask extends WorkerTask<ConsumerRecord<byte[], byte[]>, SinkReco
                           StatusBackingStore statusBackingStore,
                           Supplier<List<ErrorReporter<ConsumerRecord<byte[], byte[]>>>> errorReportersSupplier) {
         super(id, statusListener, initialState, loader, connectMetrics, errorMetrics,
-                retryWithToleranceOperator, transformationChain, errorReportersSupplier, time, statusBackingStore);
+                retryWithToleranceOperator, transformationChain, errorReportersSupplier, time, statusBackingStore, workerConfig.contextPrefix());
 
         this.workerConfig = workerConfig;
         this.task = task;
@@ -491,6 +491,7 @@ class WorkerSinkTask extends WorkerTask<ConsumerRecord<byte[], byte[]>, SinkReco
     public String toString() {
         return "WorkerSinkTask{" +
                 "id=" + id +
+                ", context=" + workerConfig.contextPrefix() +
                 '}';
     }
 

@@ -174,7 +174,7 @@ public class MirrorMaker {
             plugins.compareAndSwapWithDelegatingLoader();
 
             workerConfigMap.put(sourceAndTarget, workerProps);
-            distributedConfigMap.put(sourceAndTarget, new DistributedConfig(workerProps));
+            distributedConfigMap.put(sourceAndTarget, new MirrorMakerWorkerConfig(workerProps, sourceAndTarget.toString()));
         });
 
         mmStarter = new MirrorMakerStarter();

@@ -67,24 +67,24 @@ public class LoggingContextTest {
 
     @Test
     public void shouldNotAllowNullConnectorNameForConnectorContext() {
-        assertThrows(NullPointerException.class, () -> LoggingContext.forConnector(null));
+        assertThrows(NullPointerException.class, () -> LoggingContext.forConnector(null, null));
     }
 
     @Test
     public void shouldNotAllowNullTaskIdForTaskContext() {
-        assertThrows(NullPointerException.class, () -> LoggingContext.forTask(null));
+        assertThrows(NullPointerException.class, () -> LoggingContext.forTask(null, null));
     }
 
     @Test
     public void shouldNotAllowNullTaskIdForOffsetContext() {
-        assertThrows(NullPointerException.class, () -> LoggingContext.forOffsets(null));
+        assertThrows(NullPointerException.class, () -> LoggingContext.forOffsets(null, null));
     }
 
     @Test
     public void shouldCreateAndCloseLoggingContextEvenWithNullContextMap() {
         MDC.clear();
         assertMdc(null, null, null);
-        try (LoggingContext loggingContext = LoggingContext.forConnector(CONNECTOR_NAME)) {
+        try (LoggingContext loggingContext = LoggingContext.forConnector(CONNECTOR_NAME, null)) {
             assertMdc(CONNECTOR_NAME, null, Scope.WORKER);
             log.info("Starting Connector");
         }
@@ -93,11 +93,20 @@ public class LoggingContextTest {
 
     @Test
     public void shouldCreateConnectorLoggingContext() {
+        shouldCreateConnectorLoggingContext(null);
+    }
+
+    @Test
+    public void shouldCreateConnectorLoggingContextWithPrefix() {
+        shouldCreateConnectorLoggingContext("custom-context-prefix");
+    }
+
+    private void shouldCreateConnectorLoggingContext(String prefix) {
         assertMdcExtrasUntouched();
         assertMdc(null, null, null);
 
-        try (LoggingContext loggingContext = LoggingContext.forConnector(CONNECTOR_NAME)) {
-            assertMdc(CONNECTOR_NAME, null, Scope.WORKER);
+        try (LoggingContext loggingContext = LoggingContext.forConnector(CONNECTOR_NAME, prefix)) {
+            assertMdc(CONNECTOR_NAME, null, Scope.WORKER, prefix);
             log.info("Starting Connector");
         }
 
@@ -107,9 +116,18 @@ public class LoggingContextTest {
 
     @Test
     public void shouldCreateTaskLoggingContext() {
+        shouldCreateTaskLoggingContext(null);
+    }
+
+    @Test
+    public void shouldCreateTaskLoggingContextWithPrefix() {
+        shouldCreateTaskLoggingContext("custom-context-prefix");
+    }
+
+    private void shouldCreateTaskLoggingContext(String prefix) {
         assertMdcExtrasUntouched();
-        try (LoggingContext loggingContext = LoggingContext.forTask(TASK_ID1)) {
-            assertMdc(TASK_ID1.connector(), TASK_ID1.task(), Scope.TASK);
+        try (LoggingContext loggingContext = LoggingContext.forTask(TASK_ID1, prefix)) {
+            assertMdc(TASK_ID1.connector(), TASK_ID1.task(), Scope.TASK, prefix);
             log.info("Running task");
         }
 
@@ -119,9 +137,18 @@ public class LoggingContextTest {
 
     @Test
     public void shouldCreateOffsetsLoggingContext() {
+        shouldCreateOffsetsLoggingContext(null);
+    }
+
+    @Test
+    public void shouldCreateOffsetsLoggingContextWithPrefix() {
+        shouldCreateOffsetsLoggingContext("custom-context-prefix");
+    }
+
+    private void shouldCreateOffsetsLoggingContext(String prefix) {
         assertMdcExtrasUntouched();
-        try (LoggingContext loggingContext = LoggingContext.forOffsets(TASK_ID1)) {
-            assertMdc(TASK_ID1.connector(), TASK_ID1.task(), Scope.OFFSETS);
+        try (LoggingContext loggingContext = LoggingContext.forOffsets(TASK_ID1, prefix)) {
+            assertMdc(TASK_ID1.connector(), TASK_ID1.task(), Scope.OFFSETS, prefix);
             log.info("Running task");
         }
 
@@ -133,20 +160,20 @@ public class LoggingContextTest {
     public void shouldAllowNestedLoggingContexts() {
         assertMdcExtrasUntouched();
         assertMdc(null, null, null);
-        try (LoggingContext loggingContext1 = LoggingContext.forConnector(CONNECTOR_NAME)) {
+        try (LoggingContext loggingContext1 = LoggingContext.forConnector(CONNECTOR_NAME, null)) {
             assertMdc(CONNECTOR_NAME, null, Scope.WORKER);
             log.info("Starting Connector");
             // Set the extra MDC parameter, as if the connector were
             MDC.put(EXTRA_KEY3, EXTRA_VALUE3);
             assertConnectorMdcSet();
 
-            try (LoggingContext loggingContext2 = LoggingContext.forTask(TASK_ID1)) {
+            try (LoggingContext loggingContext2 = LoggingContext.forTask(TASK_ID1, null)) {
                 assertMdc(TASK_ID1.connector(), TASK_ID1.task(), Scope.TASK);
                 log.info("Starting task");
                 // The extra connector-specific MDC parameter should still be set
                 assertConnectorMdcSet();
 
-                try (LoggingContext loggingContext3 = LoggingContext.forOffsets(TASK_ID1)) {
+                try (LoggingContext loggingContext3 = LoggingContext.forOffsets(TASK_ID1, null)) {
                     assertMdc(TASK_ID1.connector(), TASK_ID1.task(), Scope.OFFSETS);
                     assertConnectorMdcSet();
                     log.info("Offsets for task");
@@ -174,6 +201,10 @@ public class LoggingContextTest {
     }
 
     protected void assertMdc(String connectorName, Integer taskId, Scope scope) {
+        assertMdc(connectorName, taskId, scope, null);
+    }
+
+    protected void assertMdc(String connectorName, Integer taskId, Scope scope, String prefix) {
         String context = MDC.get(LoggingContext.CONNECTOR_CONTEXT);
         if (context != null) {
             assertEquals(
@@ -181,6 +212,13 @@ public class LoggingContextTest {
                 context.startsWith("[" + connectorName),
                 "Context should begin with connector name when the connector name is non-null"
             );
+            assertTrue(context.startsWith("["), "Context should begin with a '['");
+            if (prefix != null) {
+                assertTrue(context.contains(prefix), "Context should contain the prefix");
+            }
+            if (connectorName != null) {
+                assertTrue(context.contains(connectorName), "Context should contain the connector name");
+            }
             if (scope != null) {
                 assertTrue(context.contains(scope.toString()), "Context should contain the scope");
             }

@@ -349,6 +349,7 @@ class WorkerSourceTask extends AbstractWorkerSourceTask {
     public String toString() {
         return "WorkerSourceTask{" +
                 "id=" + id +
+                ", context=" + workerConfig.contextPrefix() +
                 '}';
     }
 

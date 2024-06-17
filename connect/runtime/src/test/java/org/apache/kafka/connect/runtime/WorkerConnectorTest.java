@@ -124,7 +124,8 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
         doThrow(exception).when(connector).initialize(any());
 
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics,
+                listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertFailedMetric(workerConnector);
@@ -147,7 +148,7 @@ public class WorkerConnectorTest {
         doThrow(exception).when(connector).initialize(any());
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertFailedMetric(workerConnector);
@@ -173,7 +174,8 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics,
+                listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -199,7 +201,7 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
 
@@ -230,7 +232,7 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -263,7 +265,8 @@ public class WorkerConnectorTest {
 
         Callback<TargetState> onStateChange = mockCallback();
 
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics,
+                listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -294,7 +297,7 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -320,7 +323,7 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -349,7 +352,7 @@ public class WorkerConnectorTest {
         doThrow(exception).when(connector).start(CONFIG);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -382,7 +385,7 @@ public class WorkerConnectorTest {
         Callback<TargetState> onFirstStateChange = mockCallback();
         Callback<TargetState> onSecondStateChange = mockCallback();
         Callback<TargetState> onThirdStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -423,7 +426,8 @@ public class WorkerConnectorTest {
         doThrow(exception).when(connector).stop();
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics,
+                listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -450,7 +454,8 @@ public class WorkerConnectorTest {
 
         Callback<TargetState> onStateChange = mockCallback();
 
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics,
+                listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -478,7 +483,8 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics,
+                listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -511,7 +517,7 @@ public class WorkerConnectorTest {
         when(connector.version()).thenReturn(VERSION);
 
         Callback<TargetState> onStateChange = mockCallback();
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, connector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
         assertInitializedMetric(workerConnector);
@@ -543,7 +549,7 @@ public class WorkerConnectorTest {
         setup(connectorType);
         Connector badConnector = mock(Connector.class);
         when(badConnector.version()).thenReturn(VERSION);
-        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, badConnector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader);
+        WorkerConnector workerConnector = new WorkerConnector(CONNECTOR, badConnector, connectorConfig, ctx, metrics, listener, offsetStorageReader, offsetStore, classLoader, null);
 
         workerConnector.initialize();
 

@@ -98,6 +98,10 @@ public class ServerConfigs {
     public static final String BROKER_RACK_CONFIG = "broker.rack";
     public static final String BROKER_RACK_DOC = "Rack of the broker. This will be used in rack aware replication assignment for fault tolerance. Examples: <code>RACK1</code>, <code>us-east-1d</code>";
 
+    public static final String CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_CONFIG = "cloudera.enable.multi.level.rack.awareness";
+    public static final boolean CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_DEFAULT = false;
+    public static final String CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_DOC = "Enable Cloudera's multi-level rack definitions. Example: `/us-east-1/racka`, `/us-east-1/rackb`, `/us-west-1/racka`, etc.";
+
     /** ********* Controlled shutdown configuration ***********/
     public static final String CONTROLLED_SHUTDOWN_MAX_RETRIES_CONFIG = "controlled.shutdown.max.retries";
     public static final int CONTROLLED_SHUTDOWN_MAX_RETRIES_DEFAULT = 3;
@@ -164,6 +168,7 @@ public class ServerConfigs {
             .define(AUDITOR_CLASSES_CONFIG, LIST, AUDITOR_CLASSES_DEFAULT, LOW, AUDITOR_CLASSES_DOC)
             /************ Rack Configuration ******************/
             .define(BROKER_RACK_CONFIG, STRING, null, MEDIUM, BROKER_RACK_DOC)
+            .define(CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_CONFIG, BOOLEAN, CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_DEFAULT, MEDIUM, CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_DOC)
             /** ********* Controlled shutdown configuration ***********/
             .define(CONTROLLED_SHUTDOWN_MAX_RETRIES_CONFIG, INT, CONTROLLED_SHUTDOWN_MAX_RETRIES_DEFAULT, MEDIUM, CONTROLLED_SHUTDOWN_MAX_RETRIES_DOC)
             .define(CONTROLLED_SHUTDOWN_RETRY_BACKOFF_MS_CONFIG, LONG, CONTROLLED_SHUTDOWN_RETRY_BACKOFF_MS_DEFAULT, MEDIUM, CONTROLLED_SHUTDOWN_RETRY_BACKOFF_MS_DOC)

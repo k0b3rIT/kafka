@@ -118,6 +118,7 @@
 
     <subpackage name="admin">
         <allow pkg="org.apache.kafka.server.common" />
+        <allow pkg="com.cloudera.kafka.metadata" />
     </subpackage>
 
 </import-control>

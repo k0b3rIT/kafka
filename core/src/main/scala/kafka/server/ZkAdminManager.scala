@@ -187,7 +187,8 @@ class ZkAdminManager(val config: KafkaConfig,
 
         val assignments = if (topic.assignments.isEmpty) {
           CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(
-            brokers.asJavaCollection, resolvedNumPartitions, resolvedReplicationFactor))
+            brokers.asJavaCollection, resolvedNumPartitions, resolvedReplicationFactor,
+            config.clouderaMultiLevelRackAwareness))
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
           // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
@@ -359,7 +360,8 @@ class ZkAdminManager(val config: KafkaConfig,
         }
 
         val assignmentForNewPartitions = adminZkClient.createNewPartitionsAssignment(
-          topic, existingAssignment, allBrokers, newPartition.count, newPartitionsAssignment)
+          topic, existingAssignment, allBrokers, newPartition.count, newPartitionsAssignment,
+          multiLevelRackAwareAssignment = config.clouderaMultiLevelRackAwareness)
 
         if (validateOnly) {
           CreatePartitionsMetadata(topic, (existingAssignment ++ assignmentForNewPartitions).keySet)

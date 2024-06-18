@@ -36,6 +36,7 @@ public class ReassignPartitionsCommandOptions extends CommandDefaultOptions {
     final OptionSpec<String> topicsToMoveJsonFileOpt;
     final OptionSpec<String> brokerListOpt;
     final OptionSpec<?> disableRackAware;
+    final OptionSpec<?> enableMultiLevelRackAware;
     final OptionSpec<Long> interBrokerThrottleOpt;
     final OptionSpec<Long> replicaAlterLogDirsThrottleOpt;
     final OptionSpec<Long> timeoutOpt;
@@ -84,6 +85,8 @@ public class ReassignPartitionsCommandOptions extends CommandDefaultOptions {
             .describedAs("brokerlist")
             .ofType(String.class);
         disableRackAware = parser.accepts("disable-rack-aware", "Disable rack aware replica assignment");
+        enableMultiLevelRackAware = parser.accepts("enable-multilevel-rack-aware", "Enable multilevel rack aware replica assignment. This is a" +
+                "Cloudera specific feature that may be subject to change in the upcoming releases.");
         interBrokerThrottleOpt = parser.accepts("throttle", "The movement of partitions between brokers will be throttled to this value (bytes/sec). " +
                 "This option can be included with --execute when a reassignment is started, and it can be altered by resubmitting the current reassignment " +
                 "along with the --additional flag. The throttle rate should be at least 1 KB/s.")

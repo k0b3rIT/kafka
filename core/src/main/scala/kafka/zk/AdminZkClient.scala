@@ -60,7 +60,7 @@ class AdminZkClient(zkClient: KafkaZkClient,
                   rackAwareMode: RackAwareMode = RackAwareMode.Enforced,
                   usesTopicId: Boolean = false): Unit = {
     val brokerMetadatas = getBrokerMetadatas(rackAwareMode).asJava
-    val replicaAssignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions, replicationFactor))
+    val replicaAssignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions, replicationFactor, false))
     createTopicWithAssignment(topic, topicConfig, replicaAssignment, usesTopicId = usesTopicId)
   }
 
@@ -255,7 +255,8 @@ class AdminZkClient(zkClient: KafkaZkClient,
                                     existingAssignment: Map[Int, ReplicaAssignment],
                                     allBrokers: Seq[BrokerMetadata],
                                     numPartitions: Int = 1,
-                                    replicaAssignment: Option[Map[Int, Seq[Int]]] = None): Map[Int, ReplicaAssignment] = {
+                                    replicaAssignment: Option[Map[Int, Seq[Int]]] = None,
+                                    multiLevelRackAwareAssignment : Boolean = false): Map[Int, ReplicaAssignment] = {
     val existingAssignmentPartition0 = existingAssignment.getOrElse(0,
       throw new AdminOperationException(
         s"Unexpected existing replica assignment for topic '$topic', partition id 0 is missing. " +
@@ -276,7 +277,7 @@ class AdminZkClient(zkClient: KafkaZkClient,
     val proposedAssignmentForNewPartitions = replicaAssignment.getOrElse {
       val startIndex = math.max(0, allBrokers.indexWhere(_.id >= existingAssignmentPartition0.head))
       CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(allBrokers.asJava, partitionsToAdd, existingAssignmentPartition0.size,
-        startIndex, existingAssignment.size))
+        startIndex, existingAssignment.size, multiLevelRackAwareAssignment))
     }
 
     proposedAssignmentForNewPartitions.map { case (tp, replicas) =>

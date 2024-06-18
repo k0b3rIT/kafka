@@ -36,7 +36,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     assertEquals(List(0, 3, 1, 5, 4, 2), newList.asScala.toList)
     val anotherList = AdminUtils.getRackAlternatedBrokerList((rackMap.toMap - 5).map(e => (e._1.asInstanceOf[Integer], e._2)).asJava)
     assertEquals(List(0, 3, 1, 4, 2), anotherList.asScala.toList)
-    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(rackMap), 7, 3, 0, 0))
+    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(rackMap), 7, 3, 0, 0, false))
     val expected = Map(0 -> List(0, 3, 1),
                        1 -> List(3, 1, 5),
                        2 -> List(1, 5, 4),
@@ -53,7 +53,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 6
     val replicationFactor = 3
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor, 2, 0))
+      replicationFactor, 2, 0, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -64,7 +64,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 6
     val replicationFactor = 3
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor))
+      replicationFactor, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -75,7 +75,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 13
     val replicationFactor = 3
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor, 0, 0))
+      replicationFactor, 0, 0, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor, verifyLeaderDistribution = false, verifyReplicasDistribution = false)
   }
@@ -86,7 +86,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 12
     val replicationFactor = 3
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor))
+      replicationFactor, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor, verifyReplicasDistribution = false)
   }
@@ -97,7 +97,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 12
     val replicationFactor = 2
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor))
+      replicationFactor, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -108,7 +108,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 12
     val replicationFactor = 2
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor, -1, 12))
+      replicationFactor, -1, 12, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -119,7 +119,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 6
     val replicationFactor = 2
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor))
+      replicationFactor, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -129,7 +129,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val brokerRackMapping = Map(0 -> "rack1", 1 -> "rack2", 4 -> "rack3")
     val numPartitions = 3
     val replicationFactor = 2
-    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions, replicationFactor))
+    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions, replicationFactor, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions, replicationFactor)
   }
 
@@ -140,7 +140,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val brokerRackMapping = Map(0 -> "rack1", 1 -> "rack2", 2 -> "rack2", 3 -> "rack3", 4 -> "rack3", 5 -> "rack1",
       6 -> "rack1", 7 -> "rack2", 8 -> "rack2", 9 -> "rack3", 10 -> "rack1", 11 -> "rack3")
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor))
+      replicationFactor, false))
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -150,7 +150,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 6
     val replicationFactor = 5
     val brokerRackMapping = Map(0 -> "rack1", 1 -> "rack2", 2 -> "rack2", 3 -> "rack3", 4 -> "rack3", 5 -> "rack2")
-    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions, replicationFactor))
+    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions, replicationFactor, false))
     assertEquals(List.fill(assignment.size)(replicationFactor), assignment.values.toIndexedSeq.map(_.size))
     val distribution = getReplicaDistribution(assignment, brokerRackMapping)
     for (partition <- 0 until numPartitions)
@@ -163,7 +163,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val replicationFactor = 2
     val brokerRackMapping = Map(0 -> "rack1", 1 -> "rack2", 2 -> "rack2", 3 -> "rack3", 4 -> "rack3", 5 -> "rack2")
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor))
+      replicationFactor, false))
     assertEquals(List.fill(assignment.size)(replicationFactor), assignment.values.toIndexedSeq.map(_.size))
     val distribution = getReplicaDistribution(assignment, brokerRackMapping)
     for (partition <- 0 to 5)
@@ -175,7 +175,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 6
     val replicationFactor = 3
     val brokerRackMapping = Map(0 -> "rack1", 1 -> "rack1", 2 -> "rack1", 3 -> "rack1", 4 -> "rack1", 5 -> "rack1")
-    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions, replicationFactor))
+    val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions, replicationFactor, false))
     assertEquals(List.fill(assignment.size)(replicationFactor), assignment.values.toIndexedSeq.map(_.size))
     val distribution = getReplicaDistribution(assignment, brokerRackMapping)
     for (partition <- 0 until numPartitions)
@@ -193,7 +193,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val brokerMetadatas = toBrokerMetadata(rackInfo)
     assertEquals(brokerList, brokerMetadatas.asScala.map(_.id))
     val assignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(brokerMetadatas, numPartitions, replicationFactor,
-      2, -1))
+      2, -1, false))
     checkReplicaDistribution(assignment, rackInfo, 5, 6, 4,
       verifyRackAware = false, verifyLeaderDistribution = false, verifyReplicasDistribution = false)
   }
@@ -204,11 +204,11 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
 
     // test 0 replication factor
     assertThrows(classOf[InvalidReplicationFactorException],
-      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 0))
+      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 0, false))
 
     // test wrong replication factor
     assertThrows(classOf[InvalidReplicationFactorException],
-      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 6))
+      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 6, false))
 
     // correct assignment
     val expectedAssignment = Map(
@@ -223,7 +223,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
         8 -> List(3, 0, 1),
         9 -> List(4, 1, 2))
 
-    val actualAssignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 3, 0, -1))
+    val actualAssignment = CoreUtils.replicaToBrokerAssignmentAsScala(AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 3, 0, -1, false))
     assertEquals(expectedAssignment, actualAssignment)
   }
 
@@ -234,18 +234,18 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
 
     // test 0 partition
     assertThrows(classOf[InvalidPartitionsException],
-      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 0, 0, -1, -1))
+      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 0, 0, -1, -1, false))
 
     // test 0 replication factor
     assertThrows(classOf[InvalidReplicationFactorException],
-      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 0, -1, -1))
+      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 0, -1, -1, false))
 
     // test wrong replication factor
     assertThrows(classOf[InvalidReplicationFactorException],
-      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, brokerMetadatas.size() + 1, -1, -1))
+      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, brokerMetadatas.size() + 1, -1, -1, false))
 
     // test wrong brokerMetadatas
     assertThrows(classOf[AdminOperationException],
-      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, brokerMetadatas.size(), -1, -1))
+      () => AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, brokerMetadatas.size(), -1, -1, false))
   }
 }

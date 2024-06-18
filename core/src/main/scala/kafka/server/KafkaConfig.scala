@@ -432,6 +432,7 @@ class KafkaConfig private(doLog: Boolean, val props: util.Map[_, _])
   def numNetworkThreads = getInt(SocketServerConfigs.NUM_NETWORK_THREADS_CONFIG)
 
   /***************** rack configuration **************/
+  val clouderaMultiLevelRackAwareness = getBoolean(ServerConfigs.CLOUDERA_ENABLE_MULTI_LEVEL_RACK_AWARENESS_CONFIG)
   val rack = Option(getString(ServerConfigs.BROKER_RACK_CONFIG))
   val replicaSelectorClassName = Option(getString(ReplicationConfigs.REPLICA_SELECTOR_CLASS_CONFIG))
 

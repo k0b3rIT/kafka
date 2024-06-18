@@ -20,9 +20,17 @@ import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.server.common.AdminOperationException;
 
+import com.cloudera.kafka.metadata.LeafIterator;
+import com.cloudera.kafka.metadata.MultiLevelRack;
+import com.cloudera.kafka.metadata.NodeIterator;
+import com.cloudera.kafka.metadata.TreeIterator;
+
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -30,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class AdminUtils {
@@ -39,8 +48,9 @@ public class AdminUtils {
 
     public static Map<Integer, List<Integer>> assignReplicasToBrokers(Collection<BrokerMetadata> brokerMetadatas,
                                                                       int nPartitions,
-                                                                      int replicationFactor) {
-        return assignReplicasToBrokers(brokerMetadatas, nPartitions, replicationFactor, -1, -1);
+                                                                      int replicationFactor,
+                                                                      boolean multiLevelRackAssignment) {
+        return assignReplicasToBrokers(brokerMetadatas, nPartitions, replicationFactor, -1, -1, multiLevelRackAssignment);
     }
 
     /**
@@ -119,7 +129,8 @@ public class AdminUtils {
                                                                       int nPartitions,
                                                                       int replicationFactor,
                                                                       int fixedStartIndex,
-                                                                      int startPartitionId) {
+                                                                      int startPartitionId,
+                                                                      boolean multiLevelRackAwareAssignment) {
         if (nPartitions <= 0)
             throw new InvalidPartitionsException("Number of partitions must be larger than 0.");
         if (replicationFactor <= 0)
@@ -129,7 +140,10 @@ public class AdminUtils {
         if (brokerMetadatas.stream().noneMatch(b -> b.rack.isPresent()))
             return assignReplicasToBrokersRackUnaware(nPartitions, replicationFactor, brokerMetadatas.stream().map(b -> b.id).collect(Collectors.toList()), fixedStartIndex,
                 startPartitionId);
-        else {
+        else if (multiLevelRackAwareAssignment) {
+            return assignReplicasToBrokersMultiLevelRackAware(nPartitions, replicationFactor, brokerMetadatas, fixedStartIndex,
+                startPartitionId);
+        } else {
             return assignReplicasToBrokersRackAware(nPartitions, replicationFactor, brokerMetadatas, fixedStartIndex,
                 startPartitionId);
         }
@@ -207,6 +221,204 @@ public class AdminUtils {
             currentPartitionId += 1;
         }
         return ret;
+    }
+
+    private static Map<Integer, List<Integer>> assignReplicasToBrokersMultiLevelRackAware(int nPartitions,
+            int replicationFactor,
+            Collection<BrokerMetadata> brokerMetadatas,
+            int fixedStartIndex,
+            int startPartitionId) {
+
+        Map<Integer, MultiLevelRack> brokerRackMap = validateBrokerMetadata(brokerMetadatas);
+
+        // Init structure to hold assignment
+        Map<Integer, List<PartitionReplica>> currentMapping = new HashMap<>();
+        for (BrokerMetadata brokerMetadata : brokerMetadatas) {
+            currentMapping.put(brokerMetadata.id, new ArrayList<>());
+        }
+
+        TreeIterator<Integer> brokerIteratorFull = constructStructuredIterator(brokerRackMap);
+
+        int startPartition = Math.max(0, startPartitionId);
+        int endPartition = startPartition + nPartitions;
+
+        // Randomize first selected broker
+        int startIndex = fixedStartIndex >= 0 ? fixedStartIndex : RAND.nextInt(brokerIteratorFull.cycle());
+        brokerIteratorFull.advance(startIndex);
+
+        for (int i = startPartition; i < endPartition; i++) {
+            List<Integer> brokersForPartition = new ArrayList<>();
+            // Check if even distribution can be satisfied
+            while (brokersForPartition.size() < replicationFactor) {
+                Integer next = brokerIteratorFull.next();
+                if (evenReplicaDistributionIsPossible(brokersForPartition, next)) {
+                    brokersForPartition.add(next);
+                }
+            }
+            // Reshuffle for even leader distribution. If no reshuffle is needed, the original order will be returned.
+            List<Map.Entry<Integer, Integer>> brokerReplicas = reShuffleForEvenLeaderDistribution(brokersForPartition, currentMapping);
+
+            for (Map.Entry<Integer, Integer> replica: brokerReplicas) {
+                PartitionReplica currentReplica = new PartitionReplica(i, replica.getValue());
+                List<PartitionReplica> newSequence = currentMapping.getOrDefault(replica.getKey(), new ArrayList<>());
+                newSequence.add(currentReplica);
+                currentMapping.put(replica.getKey(), newSequence);
+            }
+        }
+        return convertBrokerReplicaMappingToPartitionBrokerMapping(currentMapping);
+    }
+
+    private static Map<Integer, MultiLevelRack> validateBrokerMetadata(Collection<BrokerMetadata> brokerMetadata) {
+        List<BrokerMetadata> malFormed = brokerMetadata
+                .stream()
+                .filter(metadata -> metadata.rack.isPresent() && !metadata.rack.get().matches("(/\\w+)+"))
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (!malFormed.isEmpty()) {
+            throw new AdminOperationException("Some racks are malformed. A rack name begins with '/', and consists of words separated by '/'.");
+        }
+
+        Map<Integer, MultiLevelRack> brokerRackMap = brokerMetadata
+                .stream()
+                .filter(metadata -> metadata.rack.isPresent())
+                .collect(Collectors.toMap(
+                        metadata -> metadata.id,
+                        metadata -> new MultiLevelRack(
+                                Arrays.asList(metadata.rack.get().split("/")).stream().filter(s -> !s.isEmpty()).collect(Collectors.toList()))
+                ));
+
+        List<Integer> depthOfLevels = brokerRackMap
+                .values()
+                .stream()
+                .map(MultiLevelRack::size)
+                .collect(Collectors.toList());
+
+        boolean equalDepths = depthOfLevels.stream().allMatch(depth -> depth.equals(depthOfLevels.get(0)));
+
+        if (!equalDepths) {
+            throw new AdminOperationException("Not all brokers have equal level of depth rack information" +
+                    "for replica multi-level rack aware assignment.");
+        }
+        return brokerRackMap;
+    }
+
+    private static Map<Integer, List<Integer>> convertBrokerReplicaMappingToPartitionBrokerMapping(Map<Integer, List<PartitionReplica>> currentMapping) {
+        // Flatten the map to a list of ((brokerId, replica), partition)
+        List<AbstractMap.SimpleEntry<AbstractMap.SimpleEntry<Integer, Integer>, Integer>> flattenedList = currentMapping.entrySet()
+                .stream()
+                .flatMap(entry -> entry.getValue()
+                        .stream()
+                        .map(replica -> new AbstractMap.SimpleEntry<>(
+                                new AbstractMap.SimpleEntry<>(entry.getKey(), replica.replica()),
+                                replica.partition())))
+                .collect(Collectors.toList());
+
+        // Swap and group by the new key (partition)
+        Map<Integer, List<AbstractMap.SimpleEntry<Integer, Integer>>> groupedMap = flattenedList.stream()
+                .collect(Collectors.groupingBy(AbstractMap.SimpleEntry::getValue,
+                        Collectors.mapping(AbstractMap.SimpleEntry::getKey, Collectors.toList())));
+
+        // Sort by replica and extract broker IDs
+        return groupedMap.entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        entry -> entry.getValue()
+                                .stream()
+                                .sorted(Comparator.comparingInt(Map.Entry::getValue))
+                                .map(Map.Entry::getKey)
+                                .collect(Collectors.toList())));
+    }
+
+
+    private static boolean evenReplicaDistributionIsPossible(List<Integer> brokersForPartition, int next) {
+        return !brokersForPartition.contains(next);
+    }
+
+    private static Map<MultiLevelRack, List<Integer>> groupBrokersAtLevel(Map<Integer, MultiLevelRack> brokerRackMap, int level) {
+        return brokerRackMap.entrySet().stream()
+                .collect(Collectors.groupingBy(
+                        entry -> entry.getValue().take(level),
+                        Collectors.mapping(Map.Entry::getKey, Collectors.toList())
+                ));
+    }
+
+    private static List<MultiLevelRack> getRacksWithPrefix(List<MultiLevelRack> sortedRacks, MultiLevelRack rack) {
+        return sortedRacks.stream()
+                .map(r -> r.take(rack.size() + 1))
+                .distinct()
+                .filter(r -> r.startsWith(rack))
+                .collect(Collectors.toList());
+    }
+
+    private static TreeIterator<Integer> constructStructuredIteratorForRack(
+            Map<Integer, MultiLevelRack> brokerRackMap,
+            List<MultiLevelRack> sortedRacks,
+            MultiLevelRack rack,
+            int maxLevel) {
+        if (rack.size() == maxLevel) {
+            List<Integer> brokers = groupBrokersAtLevel(brokerRackMap, maxLevel).get(rack);
+            Collections.sort(brokers);
+            return new LeafIterator<>(rack, brokers);
+        } else {
+            List<TreeIterator<Integer>> iters = new ArrayList<>();
+            for (MultiLevelRack deeperRack : getRacksWithPrefix(sortedRacks, rack)) {
+                iters.add(constructStructuredIteratorForRack(brokerRackMap, sortedRacks, deeperRack, maxLevel));
+            }
+            return new NodeIterator<>(rack, iters);
+        }
+    }
+
+    private static TreeIterator<Integer> constructStructuredIterator(Map<Integer, MultiLevelRack> brokerRackMap) {
+        int maxLevel = brokerRackMap.values().iterator().next().size();
+        List<MultiLevelRack> sortedRacks = brokerRackMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .distinct()
+                .collect(Collectors.toList());
+        return constructStructuredIteratorForRack(brokerRackMap, sortedRacks, new MultiLevelRack(), maxLevel);
+    }
+
+    private static Map<Integer, Integer> countDistribution(Map<Integer, List<PartitionReplica>> currentMapping,
+            Predicate<PartitionReplica> predicate) {
+        return currentMapping.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> (int) entry.getValue().stream().filter(predicate).count()
+                ));
+    }
+
+    private static List<Map.Entry<Integer, Integer>> reShuffleForEvenLeaderDistribution(List<Integer> brokersForPartition,
+            Map<Integer, List<PartitionReplica>> currentMapping) {
+        Map<Integer, Integer> distributionOfLeaders = countDistribution(currentMapping, pr -> pr.replica() == 0);
+
+        List<Integer> brokerPreferences = brokersForPartition.stream()
+                .sorted(Comparator.comparing(distributionOfLeaders::get))
+                .collect(Collectors.toList());
+
+        List<Map.Entry<Integer, Integer>> result = new ArrayList<>();
+        for (int i = 0; i < brokerPreferences.size(); i++) {
+            result.add(new AbstractMap.SimpleEntry<>(brokerPreferences.get(i), i));
+        }
+        return result;
+    }
+
+    private static class PartitionReplica {
+        private int partition;
+        private int replica;
+
+        public int partition() {
+            return partition;
+        }
+
+        public int replica() {
+            return replica;
+        }
+
+        public PartitionReplica(int partition, int replica) {
+            this.partition = partition;
+            this.replica = replica;
+        }
     }
 
     /**

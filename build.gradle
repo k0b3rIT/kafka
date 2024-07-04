@@ -985,6 +985,7 @@ project(':core') {
     implementation project(':raft')
     implementation project(':storage')
     implementation project(':server')
+    runtimeOnly project(':metrics-reporter')
 
     implementation libs.argparse4j
     implementation libs.caffeine
@@ -3186,6 +3187,22 @@ project(':metrics-reporter') {
 
   javadoc {
     enabled = false
+  }
+
+  tasks.create(name: "copyDependantLibs", type: Copy) {
+    from (configurations.runtimeClasspath) {
+      exclude('kafka-clients*')
+      exclude('kafka-server*')
+      exclude('kafka-raft*')
+      exclude('kafka-metadata*')
+      exclude('kafka-group-coordinator*')
+    }
+    into "$buildDir/dependant-libs-${versions.scala}"
+    duplicatesStrategy 'exclude'
+  }
+
+  jar {
+    dependsOn copyDependantLibs
   }
 }
 

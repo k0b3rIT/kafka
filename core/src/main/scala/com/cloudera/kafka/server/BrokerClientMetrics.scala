@@ -18,6 +18,7 @@
 package com.cloudera.kafka.server
 
 import com.yammer.metrics.core.Meter
+import kafka.server.KafkaServer
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 import kafka.utils.Logging
 import org.apache.kafka.common.TopicPartition
@@ -28,7 +29,7 @@ import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters._
 
 class BrokerClientMetrics(clientId: String, topicPartition: TopicPartition) extends Logging {
-  private val metricsGroup = new KafkaMetricsGroup(this.getClass)
+  private val metricsGroup = new KafkaMetricsGroup(KafkaServer.getClass.getPackage.getName, this.getClass.getSimpleName)
 
   val tags: util.Map[String, String] =
     Map("clientId" -> clientId, "topic" -> topicPartition.topic, "partition" -> topicPartition.partition.toString).asJava

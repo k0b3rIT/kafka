@@ -17,30 +17,29 @@
 
 package prometheus.metrics.reporting
 
-import java.util.concurrent.TimeUnit
 import com.cloudera.kafka.prometheus.metrics.reporting.JmxMetricNames._
-import com.cloudera.kafka.prometheus.metrics.reporting.{GroupMetaData, PrometheusMetricsHandler, PrometheusMetricsServlet}
+import com.cloudera.kafka.prometheus.metrics.reporting.{PrometheusMetricsHandler, PrometheusMetricsServlet}
 import com.yammer.metrics.core.MetricsRegistry
 import io.prometheus.client.CollectorRegistry
-import kafka.common.OffsetAndMetadata
-import kafka.coordinator.group.{GroupSummary, MemberSummary}
 import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor.Assignment
 import org.apache.kafka.clients.consumer.internals.ConsumerProtocol
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.utils.Time
+import org.apache.kafka.common.message.OffsetFetchResponseData
+import org.apache.kafka.common.message.OffsetFetchResponseData.{OffsetFetchResponsePartitions, OffsetFetchResponseTopics}
+import org.apache.kafka.coordinator.group.GroupCoordinator
 import org.apache.kafka.server.metrics.{KafkaMetricsGroup, KafkaYammerMetrics}
-import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
 import org.mockito.Mockito
 
 import java.util.Collections
-import scala.collection.immutable
+import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters._
 
 
 class PrometheusMetricsTest {
 
-  val prometheusMetricsServlet: PrometheusMetricsServlet = Mockito.spy(new PrometheusMetricsServlet(null))
+  val prometheusMetricsServlet: PrometheusMetricsServlet = Mockito.spy(new PrometheusMetricsServlet(new PrometheusMetricsHandler(null: Option[() => GroupCoordinator])))
   val prometheusMetricsHandler: PrometheusMetricsHandler = Mockito.spy(prometheusMetricsServlet.getPrometheusMetricsHandler)
   val metricsRegistry: MetricsRegistry = KafkaYammerMetrics.defaultRegistry()
 
@@ -66,10 +65,7 @@ class PrometheusMetricsTest {
     val partition = "1"
     val partition2 = "2"
     val clientId1 = "testClientId1"
-    val clientId2 = "testClientId2"
-    val clientHost = "testClientHost"
     val groupId = "testGroupId"
-    val groupState = "Stable"
     val tp1 = new TopicPartition(topic, partition.toInt)
     val tp2 = new TopicPartition(topic, partition2.toInt)
     val tp3 = new TopicPartition(streamTopic, partition.toInt)
@@ -83,17 +79,16 @@ class PrometheusMetricsTest {
     assignment2.get(assignment2ByteArray)
     assignment3.get(assignment3ByteArray)
 
-    val memberSummary1 = MemberSummary("memberId1", Some("testInstanceid1"), clientId1, clientHost, new Array[Byte](10), assignment1ByteArray)
-    val memberSummary2 = MemberSummary("memberId2", Some("testInstanceid2"), clientId2, clientHost, new Array[Byte](10), assignment2ByteArray)
-    val memberSummary3 = MemberSummary("memberId3", Some("testInstanceid3"), clientId2, clientHost, new Array[Byte](10), assignment3ByteArray)
-    val groupSummary = GroupSummary(groupState, "consumer", "roundrobin", List(memberSummary1, memberSummary2, memberSummary3))
     val logEndOffset = 521L
     val committedOffset1 = 492
     val committedOffset2 = 599
-    val committedTimestamp = Time.SYSTEM.milliseconds()
-    val offsets = immutable.Map(tp1 -> OffsetAndMetadata(committedOffset1, "", committedTimestamp),
-      tp2 -> OffsetAndMetadata(committedOffset2, "", committedTimestamp))
-    val groupMetaData = GroupMetaData(groupId, groupSummary, offsets)
+    val partitionOffset1 = new OffsetFetchResponsePartitions().setPartitionIndex(tp1.partition()).setCommittedOffset(committedOffset1)
+    val partitionOffset2 = new OffsetFetchResponsePartitions().setPartitionIndex(tp2.partition()).setCommittedOffset(committedOffset2)
+    val partitionOffset3 = new OffsetFetchResponsePartitions().setPartitionIndex(tp3.partition())
+
+    val topic1 = new OffsetFetchResponseTopics().setName(topic).setPartitions(List(partitionOffset1, partitionOffset2).asJava)
+    val topic2 = new OffsetFetchResponseTopics().setName(streamTopic).setPartitions(List(partitionOffset3).asJava)
+    val groupMetaData = new OffsetFetchResponseData.OffsetFetchResponseGroup().setGroupId(groupId).setTopics(List(topic1, topic2).asJava)
 
     setupConsumerRelatedMock(topic, partition.toInt, List(groupMetaData))
 
@@ -261,7 +256,7 @@ class PrometheusMetricsTest {
     assertEquals(39, counter)
   }
 
-  private def setupConsumerRelatedMock(topic: String, partition: Int, groupMetaDatas: List[GroupMetaData]) = {
+  private def setupConsumerRelatedMock(topic: String, partition: Int, groupMetaDatas: List[OffsetFetchResponseData.OffsetFetchResponseGroup]) = {
     Mockito.doReturn(groupMetaDatas, Nil: _*).when(prometheusMetricsHandler).getValidConsumerGroups
     Mockito.doReturn(prometheusMetricsHandler, Nil: _*).when(prometheusMetricsServlet).getPrometheusMetricsHandler
   }

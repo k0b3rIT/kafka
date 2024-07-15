@@ -1,0 +1,74 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package nl.techop.kafka
+
+import kafka.integration.KafkaServerTestHarness
+import kafka.metrics.{KafkaMetricsReporter, KafkaMetricsReporterMBean, KafkaServerMetricsReporter}
+import kafka.server.KafkaConfig
+import kafka.utils.{TestUtils, VerifiableProperties}
+import org.junit.jupiter.api.{AfterEach, BeforeEach, TestInfo}
+
+import java.util.Properties
+import scala.util.{Failure, Success, Try}
+
+class MetricsIntegrationTestBase extends KafkaServerTestHarness {
+
+  var reporters: Seq[KafkaMetricsReporter] = _
+  var props: Properties = _
+  var port = KafkaHttpMetricsReporter.defaultPort
+
+  override def generateConfigs: collection.Seq[KafkaConfig] = {
+    val props = TestUtils.createBrokerConfig(1, zkConnect)
+    props.setProperty("kafka.metrics.reporters", "nl.techop.kafka.KafkaHttpMetricsReporter")
+    this.props = props
+    Seq(KafkaConfig.fromProps(props))
+  }
+
+  private def shutDownReporters(reporters: Seq[KafkaMetricsReporter]): Unit = {
+    reporters.filter(_.isInstanceOf[KafkaMetricsReporterMBean])
+      .foreach(_.asInstanceOf[KafkaMetricsReporterMBean].stopReporter())
+  }
+
+  @BeforeEach
+  override def setUp(testInfo: TestInfo): Unit = {
+    super.setUp(testInfo)
+    var hasPortAssigned = false
+
+    while (!hasPortAssigned && port <= 9090) {
+      props.setProperty("kafka.http.metrics.port", port.toString)
+      val reportersStartup = Try {
+        reporters = KafkaMetricsReporter.startReporters(new VerifiableProperties(props))
+        reporters.filter(_.isInstanceOf[KafkaServerMetricsReporter]).
+          foreach(_.asInstanceOf[KafkaServerMetricsReporter].setupAndStart(Some(servers.head)))
+      }
+      reportersStartup match {
+        case Success(_) => hasPortAssigned = true
+        case Failure(_) => {
+          port = port + 1
+          shutDownReporters(reporters)
+        }
+      }
+    }
+  }
+
+  @AfterEach
+  override def tearDown(): Unit = {
+    shutDownReporters(reporters)
+    super.tearDown()
+  }
+}

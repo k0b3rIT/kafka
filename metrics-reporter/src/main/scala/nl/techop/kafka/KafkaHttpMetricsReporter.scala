@@ -17,15 +17,15 @@
 package nl.techop.kafka
 
 import com.cloudera.kafka.producer.ProducerDetailsServlet
-import com.cloudera.kafka.prometheus.metrics.reporting.PrometheusMetricsServlet
+import com.cloudera.kafka.prometheus.metrics.reporting.{PrometheusMetricsHandler, PrometheusMetricsServlet}
 import com.cloudera.kafka.wrap.Kafka
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider
 import com.yammer.metrics.reporting._
-import kafka.coordinator.group.GroupMetadataManager
 import kafka.metrics.{KafkaMetricsConfig, KafkaMetricsReporterMBean, KafkaServerMetricsReporter}
 import kafka.server.KafkaBroker
 import kafka.utils.{Logging, VerifiableProperties}
 import org.apache.kafka.common.config.SslConfigs
+import org.apache.kafka.coordinator.group.GroupCoordinator
 import org.apache.kafka.server.metrics.KafkaYammerMetrics
 import org.eclipse.jetty.security._
 import org.eclipse.jetty.security.authentication.BasicAuthenticator
@@ -36,17 +36,18 @@ import org.eclipse.jetty.util.ssl.SslContextFactory
 import org.glassfish.jersey.server.ResourceConfig
 import org.glassfish.jersey.servlet.ServletContainer
 
+import java.net.URL
 import java.util.regex.Pattern
 import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
-private trait KafkaHttpMetricsReporterMBean extends KafkaMetricsReporterMBean
+trait KafkaHttpMetricsReporterMBean extends KafkaMetricsReporterMBean
 
 object KafkaHttpMetricsReporter {
   val defaultPort = 8080
   val defaultBindAddress = "localhost"
 }
 
-private class KafkaHttpMetricsReporter extends KafkaServerMetricsReporter
+class KafkaHttpMetricsReporter extends KafkaServerMetricsReporter
                               with KafkaHttpMetricsReporterMBean
                               with Logging {
 
@@ -163,8 +164,7 @@ private class KafkaHttpMetricsReporter extends KafkaServerMetricsReporter
   }
 
   private def brokerServlets(servletContextHandler: ServletContextHandler, broker: KafkaBroker): Unit = {
-    addPrometheusMetricsServlet(servletContextHandler, None)
-
+    addPrometheusMetricsServlet(servletContextHandler, Some(() => broker.groupCoordinator))
     addMetricsServlet(servletContextHandler, new ProducerDetailsServlet(broker), "/api/producer-details")
 
     val resourceConfig: ResourceConfig = new ResourceConfig
@@ -177,8 +177,9 @@ private class KafkaHttpMetricsReporter extends KafkaServerMetricsReporter
     servletContextHandler.addServlet(servletHolder, "/api/*")
   }
 
-  private def addPrometheusMetricsServlet(servletContextHandler: ServletContextHandler, groupManagerProvider: Option[() => GroupMetadataManager] = None): Unit = {
-    val prometheusMetricsServlet = new PrometheusMetricsServlet(groupManagerProvider) with NoDoTrace
+  // visible for testing
+  def addPrometheusMetricsServlet(servletContextHandler: ServletContextHandler, groupManagerProvider: Option[() => GroupCoordinator] = None): Unit = {
+    val prometheusMetricsServlet = new PrometheusMetricsServlet(new PrometheusMetricsHandler(groupManagerProvider)) with NoDoTrace
     KafkaYammerMetrics.defaultRegistry().addListener(prometheusMetricsServlet)
     addMetricsServlet(servletContextHandler, prometheusMetricsServlet, "/api/prometheus-metrics")
   }
@@ -280,8 +281,13 @@ private class KafkaHttpMetricsReporter extends KafkaServerMetricsReporter
     }
   }
 
-  private def addMetricsServlet(context: ServletContextHandler, servlet: HttpServlet, urlPattern: String): Unit = {
+  // visible for testing
+  def addMetricsServlet(context: ServletContextHandler, servlet: HttpServlet, urlPattern: String): Unit = {
     context.addServlet(new ServletHolder(servlet), urlPattern)
+  }
+
+  def getMetricsEndpoint(): URL = {
+    metricsServer.getURI.toURL
   }
 
   private trait NoDoTrace extends HttpServlet {

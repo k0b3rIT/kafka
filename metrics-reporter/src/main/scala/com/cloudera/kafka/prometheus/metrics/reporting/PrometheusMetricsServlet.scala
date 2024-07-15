@@ -17,28 +17,27 @@
 
 package com.cloudera.kafka.prometheus.metrics.reporting
 
-import java.util
-import java.util.concurrent.ConcurrentHashMap
 import com.cloudera.kafka.prometheus.metrics.reporting.JmxMetricNames._
 import com.yammer.metrics.core._
 import io.prometheus.client.exporter.MetricsServlet
 import io.prometheus.client.{Gauge => PrometheusGauge}
-
-import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
 import kafka.common.OffsetAndMetadata
-import kafka.coordinator.group.{GroupMetadataManager, GroupSummary}
+import kafka.coordinator.group.GroupSummary
 import kafka.utils.Logging
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.server.metrics.KafkaYammerMetrics
 
+import java.util
+import java.util.concurrent.ConcurrentHashMap
+import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
 import scala.util.Try
 
-class PrometheusMetricsServlet(groupManagerProvider: Option[() => GroupMetadataManager]) extends MetricsServlet with MetricsRegistryListener with Logging {
+class PrometheusMetricsServlet(prometheusMetricsHandler: PrometheusMetricsHandler) extends MetricsServlet with MetricsRegistryListener with Logging {
 
   private val mBeanNames: util.Map[String, Long] = new ConcurrentHashMap[String, Long]
   private val FIRST_INJECT = 0
-  private val prometheusMetricsHandler = new PrometheusMetricsHandler(groupManagerProvider)
   private val registry = KafkaYammerMetrics.defaultRegistry()
+
 
   override def doGet(req: HttpServletRequest, resp: HttpServletResponse): Unit = {
     val updateCache = Try(req.getParameter(PrometheusMetricsServlet.UPDATE).toBoolean).getOrElse(false)

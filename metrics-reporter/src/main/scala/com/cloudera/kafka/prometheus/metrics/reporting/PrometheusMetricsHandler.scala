@@ -20,12 +20,12 @@ package com.cloudera.kafka.prometheus.metrics.reporting
 import com.cloudera.kafka.consumer.metrics.ConsumerGroupMetricsHandler
 import com.yammer.metrics.core.MetricName
 import io.prometheus.client.{Gauge => PrometheusGauge}
-import kafka.coordinator.group.GroupMetadataManager
 import kafka.utils.Logging
+import org.apache.kafka.coordinator.group.GroupCoordinator
 
 import scala.collection.mutable
 
-class PrometheusMetricsHandler(groupManagerProvider: Option[() => GroupMetadataManager]) extends ConsumerGroupMetricsHandler(groupManagerProvider) with Logging {
+class PrometheusMetricsHandler(groupManagerProvider: Option[() => GroupCoordinator]) extends ConsumerGroupMetricsHandler(groupManagerProvider) with Logging {
 
   import JmxMetricNames._
   import PrometheusMetricsHandler._

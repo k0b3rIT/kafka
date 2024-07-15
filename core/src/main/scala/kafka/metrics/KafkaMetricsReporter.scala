@@ -23,7 +23,6 @@ package kafka.metrics
 import java.util.concurrent.atomic.AtomicBoolean
 import kafka.utils.{CoreUtils, VerifiableProperties}
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -55,7 +54,7 @@ object KafkaMetricsReporter {
   private val ReporterStarted: AtomicBoolean = new AtomicBoolean(false)
   private var reporters: ArrayBuffer[KafkaMetricsReporter] = _
 
-  def startReporters(verifiableProps: VerifiableProperties): mutable.Seq[KafkaMetricsReporter] = {
+  def startReporters(verifiableProps: VerifiableProperties): Seq[KafkaMetricsReporter] = {
     ReporterStarted synchronized {
       if (!ReporterStarted.get()) {
         reporters = ArrayBuffer[KafkaMetricsReporter]()
@@ -74,7 +73,7 @@ object KafkaMetricsReporter {
         }
       }
     }
-    reporters
+    reporters.toSeq
   }
 }
 

@@ -40,7 +40,6 @@ import org.slf4j.Logger
 
 import java.util
 import java.util.{Optional, OptionalInt}
-import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 /**
@@ -56,7 +55,7 @@ class KafkaRaftServer(
 ) extends Server with Logging {
 
   this.logIdent = s"[KafkaRaftServer nodeId=${config.nodeId}] "
-  private val kafkaMetricsReporters: mutable.Seq[KafkaMetricsReporter] =
+  private val kafkaMetricsReporters: Seq[KafkaMetricsReporter] =
     KafkaMetricsReporter.startReporters(VerifiableProperties(config.originals))
   KafkaYammerMetrics.INSTANCE.configure(config.originals)
   HttpMetricsReporterExclude.INSTANCE.configure(config.originals)

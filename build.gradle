@@ -3512,7 +3512,7 @@ project(':connect:runtime') {
 
     buildClasspath = classpath + configurations.swagger
     outputFileName = 'connect_rest'
-    outputFormat = 'YAML'
+    outputFormat = 'JSONANDYAML'
     prettyPrint = 'TRUE'
     sortOutput = 'TRUE'
     openApiFile = file("$buildDir/resources/docs/openapi.yaml")

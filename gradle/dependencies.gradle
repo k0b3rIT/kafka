@@ -91,6 +91,7 @@ versions += [
   // CVE-2023-2976 and CVE-2020-8908 can be dropped from
   // gradle/resources/dependencycheck-suppressions.xml
   checkstyle: "8.36.2",
+  classgraph: "4.8.174",
   commonsCli: "1.4",
   commonsIo: "2.14.0", // ZooKeeper dependency. Do not use, this is going away.
   commonsValidator: "1.7",
@@ -194,6 +195,7 @@ libs += [
   awaitility: "org.awaitility:awaitility:$versions.awaitility",
   bcpkix: "org.bouncycastle:bcpkix-jdk18on:$versions.bcpkix",
   caffeine: "com.github.ben-manes.caffeine:caffeine:$versions.caffeine",
+  classgraph: "io.github.classgraph:classgraph:$versions.classgraph",
   commonsCli: "commons-cli:commons-cli:$versions.commonsCli",
   commonsIo: "commons-io:commons-io:$versions.commonsIo",
   commonsValidator: "commons-validator:commons-validator:$versions.commonsValidator",

@@ -26,6 +26,7 @@ import org.apache.kafka.connect.runtime.rest.errors.ConnectRestException;
 
 import com.cloudera.kafka.connect.common.ConnectRestFilterUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -458,6 +459,7 @@ public class ConnectSecretValidationFilter implements ContainerRequestFilter {
         }
     }
 
+    @JsonIgnoreProperties(value = { "initial_state" }) //initial_state can be determined only from the connector create request
     private static class ConnectContent {
         private final String name;
         private final Map<String, String> config;

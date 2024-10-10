@@ -153,7 +153,7 @@ public class PluginUtils {
     private static final Pattern COMMA_WITH_WHITESPACE = Pattern.compile("\\s*,\\s*");
 
     private static final DirectoryStream.Filter<Path> PLUGIN_PATH_FILTER = path ->
-        Files.isDirectory(path) || isArchive(path) || isClassFile(path);
+        Files.isReadable(path) && (Files.isDirectory(path) || isArchive(path) || isClassFile(path));
 
     /**
      * Return whether the class with the given name should be loaded in isolation using a plugin

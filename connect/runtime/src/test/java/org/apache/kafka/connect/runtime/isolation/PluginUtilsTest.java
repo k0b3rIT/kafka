@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -481,6 +482,16 @@ public class PluginUtilsTest {
     }
 
     @Test
+    public void testPluginUrlsWithProtectedDirectory() throws IOException {
+        createBasicDirectoryLayout();
+        createProtectedDirectory();
+
+        List<Path> expectedUrls = createBasicExpectedUrls();
+        assertUrls(expectedUrls, PluginUtils.pluginUrls(pluginPath));
+    }
+
+
+    @Test
     public void testPluginUrlsWithRelativeSymlinkForwards() throws Exception {
         // Since this test case defines a relative symlink within an already included path, the main
         // assertion of this test is absence of exceptions and correct resolution of paths.
@@ -688,6 +699,12 @@ public class PluginUtilsTest {
         Files.createDirectories(pluginPath.resolve("transformC/more-deps"));
         Files.createFile(pluginPath.resolve("transformC/more-deps/README.txt"));
     }
+
+    private void createProtectedDirectory() throws IOException {
+        Files.createDirectories(pluginPath.resolve(".protected"),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("--x--x---")));
+    }
+
 
     private List<Path> createBasicExpectedUrls() throws IOException {
         List<Path> expectedUrls = new ArrayList<>();

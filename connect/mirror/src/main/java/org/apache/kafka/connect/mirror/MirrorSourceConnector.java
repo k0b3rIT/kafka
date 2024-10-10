@@ -108,6 +108,7 @@ public class MirrorSourceConnector extends SourceConnector {
     private Admin targetAdminClient;
     private volatile boolean useIncrementalAlterConfigs;
     private TopicListener topicListener;
+    private boolean heartbeatsReplicationEnabled;
 
     public MirrorSourceConnector() {
         // nop
@@ -122,10 +123,22 @@ public class MirrorSourceConnector extends SourceConnector {
     // visible for testing
     MirrorSourceConnector(SourceAndTarget sourceAndTarget, ReplicationPolicy replicationPolicy,
             TopicFilter topicFilter, ConfigPropertyFilter configPropertyFilter, TopicListener topicListener) {
+        this(sourceAndTarget, replicationPolicy, topicFilter, configPropertyFilter, topicListener, true);
+    }
+
+    MirrorSourceConnector(SourceAndTarget sourceAndTarget, ReplicationPolicy replicationPolicy,
+                          TopicFilter topicFilter, ConfigPropertyFilter configPropertyFilter, boolean heartbeatsReplicationEnabled) {
+        this(sourceAndTarget, replicationPolicy, topicFilter, configPropertyFilter, null, heartbeatsReplicationEnabled);
+    }
+
+    // visible for testing
+    MirrorSourceConnector(SourceAndTarget sourceAndTarget, ReplicationPolicy replicationPolicy,
+                          TopicFilter topicFilter, ConfigPropertyFilter configPropertyFilter, TopicListener topicListener, boolean heartbeatsReplicationEnabled) {
         this.sourceAndTarget = sourceAndTarget;
         this.replicationPolicy = replicationPolicy;
         this.topicFilter = topicFilter;
         this.configPropertyFilter = configPropertyFilter;
+        this.heartbeatsReplicationEnabled = heartbeatsReplicationEnabled;
         this.topicListener = topicListener;
     }
 
@@ -138,9 +151,10 @@ public class MirrorSourceConnector extends SourceConnector {
         this.configPropertyFilter = configPropertyFilter;
         this.config = config;
         this.useIncrementalAlterConfigs = !config.useIncrementalAlterConfigs().equals(MirrorSourceConfig.NEVER_USE_INCREMENTAL_ALTER_CONFIGS);
-        this.targetAdminClient = targetAdmin;                      
+        this.targetAdminClient = targetAdmin;
+        this.heartbeatsReplicationEnabled = true;
     }
-        
+
     // visible for testing
     MirrorSourceConnector(Admin sourceAdminClient, Admin targetAdminClient, MirrorSourceConfig config) {
         this.sourceAdminClient = sourceAdminClient;
@@ -163,6 +177,7 @@ public class MirrorSourceConnector extends SourceConnector {
         replicationFactor = config.replicationFactor();
         sourceAdminClient = config.forwardingAdmin(config.sourceAdminConfig("replication-source-admin"));
         targetAdminClient = config.forwardingAdmin(config.targetAdminConfig("replication-target-admin"));
+        heartbeatsReplicationEnabled = config.heartbeatsReplicationEnabled();
         useIncrementalAlterConfigs =  !config.useIncrementalAlterConfigs().equals(MirrorSourceConfig.NEVER_USE_INCREMENTAL_ALTER_CONFIGS);
         topicListener = config.topicListener();
 
@@ -751,7 +766,8 @@ public class MirrorSourceConnector extends SourceConnector {
     }
 
     boolean shouldReplicateTopic(String topic) {
-        return (topicFilter.shouldReplicateTopic(topic) || replicationPolicy.isHeartbeatsTopic(topic))
+        return (topicFilter.shouldReplicateTopic(topic)
+                || (heartbeatsReplicationEnabled && replicationPolicy.isHeartbeatsTopic(topic)))
             && !replicationPolicy.isInternalTopic(topic) && !isCycle(topic);
     }
 

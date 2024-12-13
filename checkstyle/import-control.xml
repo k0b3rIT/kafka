@@ -693,6 +693,7 @@
       <allow pkg="org.apache.kafka.common.serialization" />
       <allow pkg="org.apache.kafka.common.errors" />
       <allow pkg="org.apache.kafka.connect.storage" />
+      <allow pkg="org.apache.kafka.connect.json" />
     </subpackage>
 
     <subpackage name="file">

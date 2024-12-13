@@ -634,4 +634,10 @@ For a detailed description of spotbugs bug categories, see https://spotbugs.read
         <Bug pattern="SE_BAD_FIELD" />
     </Match>
 
+    <Match>
+        <!-- Suppress a warning about intentional missing default cases and fallthroughs. -->
+        <Class name="org.apache.kafka.connect.json.JsonConverter"/>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+    </Match>
+
 </FindBugsFilter>

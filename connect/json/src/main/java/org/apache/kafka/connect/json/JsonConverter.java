@@ -51,12 +51,14 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import static org.apache.kafka.common.utils.Utils.mkSet;
+import static org.apache.kafka.connect.json.JsonConverterConfig.REPLACE_NULL_WITH_DEFAULT_CONFIG;
 
 /**
  * Implementation of {@link Converter} and {@link HeaderConverter} that uses JSON to store schemas and objects. By
@@ -695,6 +697,11 @@ public class JsonConverter implements Converter, HeaderConverter, Versioned {
         }
     }
 
+    //Required for Debezium compatibility as we tied to v1.9.7.Final check: CDPD-77068
+    //This fix is not needed with Debezium v2.3.5.Final and above
+    private static Object convertToConnect(Schema schema, JsonNode jsonValue) {
+        return convertToConnect(schema, jsonValue, new JsonConverterConfig(Collections.singletonMap(REPLACE_NULL_WITH_DEFAULT_CONFIG, true)));
+    }
 
     private static Object convertToConnect(Schema schema, JsonNode jsonValue, JsonConverterConfig config) {
         final Schema.Type schemaType;

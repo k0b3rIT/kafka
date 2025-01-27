@@ -39,6 +39,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.net.ServerSocket;
+import java.security.InvalidParameterException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -71,19 +72,28 @@ public class LdapAuthenticationSSLTest extends AbstractLdapTestUnit {
         getLdapServer().start();
     }
 
+    private static String getStoreTypeParameter(TestInfo info) {
+        String[] storeTypes = {"jks", "pkcs12", "bks"};
+        for (String storeType : storeTypes) {
+            if (info.getDisplayName().contains("truststoreType=" + storeType)) {
+                return storeType;
+            }
+        }
+        throw new InvalidParameterException("The keystore type parameter must be one of jks, pkcs12, bks");
+    }
 
     @BeforeEach
     public void setUp(TestInfo info) {
-        String truststoreType = info.getDisplayName().split("=")[1];
+        String storeTypeParameter = getStoreTypeParameter(info);
         TestJaasConfig jaasConfig = new TestJaasConfig();
         Map<String, Object> options = new HashMap<>();
         options.put("ldap_url", "ldaps://localhost:" + port);
         options.put("user_dn_template", "uid={0},ou=users,ou=system");
         Map<String, Object> configs = new HashMap<>();
 
-        configs.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, LdapAuthenticationTestUtil.getResourceUri(LdapAuthenticationTestUtil.getTruststoreResource(truststoreType)));
+        configs.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, LdapAuthenticationTestUtil.getResourceUri(LdapAuthenticationTestUtil.getTruststoreResource(storeTypeParameter)));
         configs.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, new Password(KEYSTORE_PASSWORD));
-        configs.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, truststoreType);
+        configs.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, storeTypeParameter);
         configs.put(SslConfigs.SSL_PROTOCOL_CONFIG, SslConfigs.DEFAULT_SSL_PROTOCOL);
         jaasConfig.addEntry("jaasContext", PlainLoginModule.class.getName(), options);
         JaasContext jaasContext = new JaasContext("jaasContext", JaasContext.Type.SERVER, jaasConfig, null);

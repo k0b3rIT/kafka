@@ -44,8 +44,10 @@ class TopicMetricNameResourceTest extends KafkaServerTestHarness {
   }
 
   private def shutDownReporters(reporters: Seq[KafkaMetricsReporter]): Unit = {
-    reporters.filter(_.isInstanceOf[KafkaMetricsReporterMBean])
-      .foreach(_.asInstanceOf[KafkaMetricsReporterMBean].stopReporter())
+    if (reporters != null) {
+      reporters.filter(_.isInstanceOf[KafkaMetricsReporterMBean])
+        .foreach(_.asInstanceOf[KafkaMetricsReporterMBean].stopReporter())
+    }
   }
 
   @BeforeEach

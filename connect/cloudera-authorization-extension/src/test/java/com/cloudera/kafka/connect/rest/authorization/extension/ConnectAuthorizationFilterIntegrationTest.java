@@ -434,6 +434,30 @@ public class ConnectAuthorizationFilterIntegrationTest {
         assertEquals(404, response.getStatusLine().getStatusCode());
     }
 
+    @Test
+    public void testHealthEndpointWithoutAuth() throws Throwable {
+        verifyHealthEndpointWithUser("ANONYMOUS");
+    }
+
+    @Test
+    public void testHealthEndpointWithAuth() throws Throwable {
+        verifyHealthEndpointWithUser(NORMAL_USER);
+    }
+
+    private void verifyHealthEndpointWithUser(String user) throws Throwable {
+        RootResource resource = mock(RootResource.class);
+        expect(resource.healthCheck()).andReturn(Response.ok().build());
+        expect(principal.getName()).andReturn(user).anyTimes();
+        restServer.initializeResources(Arrays.asList(resource, authenticator, filter));
+        replay(resource, authorizer, principal);
+        HttpGet request = TestUtils.createHttpGetRequest(restServer.serverBaseUrl(), "/health");
+
+        HttpResponse response = TestUtils.execute(request);
+
+        verify(authorizer, resource, principal);
+        assertEquals(200, response.getStatusLine().getStatusCode());
+    }
+
     private HttpGet createConnectorsGetRequest(ConnectorsResource resource, Set<AuthorizableAction> actions, boolean isResultRequired, String path) throws MalformedURLException {
         if (null != actions) {
             expect(authorizer.filterAuthorized(anyObject(), anyObject())).andReturn(actions);

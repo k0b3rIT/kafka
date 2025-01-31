@@ -100,6 +100,7 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
     private static final Pattern CONNECTOR_TASK_RESTART_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/tasks/[^/]+/restart[/]?");
     private static final Pattern CONNECTOR_PERMISSIONS_REQUEST_PATTERN = Pattern.compile("^connector-permissions[/]?");
     private static final Pattern CONNECTOR_FENCE_REQUEST_PATTERN = Pattern.compile("^connectors/[^/]+/fence[/]?");
+    private static final Pattern CONNECTOR_HEALTH_CHECK_REQUEST_PATTERN = Pattern.compile("^health$");
 
     private static final List<AuthorizationMapping> AUTHORIZATION_MAPPINGS;
     static {
@@ -268,7 +269,7 @@ public class ConnectAuthorizationFilter implements ContainerRequestFilter, Conta
         String uriPath = request.getUriInfo().getPath();
         String method = request.getMethod();
 
-        if (CONNECTOR_PERMISSIONS_REQUEST_PATTERN.matcher(uriPath).matches() && HttpMethod.GET.equals(method)) {
+        if ((CONNECTOR_PERMISSIONS_REQUEST_PATTERN.matcher(uriPath).matches() || CONNECTOR_HEALTH_CHECK_REQUEST_PATTERN.matcher(uriPath).matches()) && HttpMethod.GET.equals(method)) {
             LOG.debug("Skipping request authorization since authorization is not needed.");
             return true;
         }

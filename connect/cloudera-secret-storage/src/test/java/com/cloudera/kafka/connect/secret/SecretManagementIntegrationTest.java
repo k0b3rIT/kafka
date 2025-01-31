@@ -87,7 +87,7 @@ public class SecretManagementIntegrationTest {
     @BeforeAll
     public static void setup() {
         Properties brokerProps = new Properties();
-        brokerProps.put("listeners", "PLAINTEXT://localhost:9092");
+        brokerProps.put("listeners", "EXTERNAL://localhost:9092,CONTROLLER://localhost:0");
 
         Map<String, String> workerProps = new HashMap<>();
         //Register extension

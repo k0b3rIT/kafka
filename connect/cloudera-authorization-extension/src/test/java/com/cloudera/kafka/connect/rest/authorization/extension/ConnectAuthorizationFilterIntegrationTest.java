@@ -25,6 +25,7 @@ import org.apache.kafka.connect.runtime.rest.entities.CreateConnectorRequest;
 import org.apache.kafka.connect.runtime.rest.entities.ServerInfo;
 import org.apache.kafka.connect.runtime.rest.resources.ConnectorPluginsResource;
 import org.apache.kafka.connect.runtime.rest.resources.ConnectorsResource;
+import org.apache.kafka.connect.runtime.rest.resources.InternalConnectResource;
 import org.apache.kafka.connect.runtime.rest.resources.LoggingResource;
 import org.apache.kafka.connect.runtime.rest.resources.RootResource;
 
@@ -401,7 +402,7 @@ public class ConnectAuthorizationFilterIntegrationTest {
 
     @Test
     public void testFenceConnectorResourceRequestForbidden() throws Throwable {
-        ConnectorsResource resource = mock(ConnectorsResource.class);
+        InternalConnectResource resource = mock(InternalConnectResource.class);
         restServer.initializeResources(Arrays.asList(resource, authenticator, filter));
         expect(principal.getName()).andReturn(NORMAL_USER).anyTimes();
         replay(resource, authorizer, principal);

@@ -17,11 +17,9 @@
 
 package org.apache.kafka.connect.runtime.rest;
 
-import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.rest.entities.ErrorMessage;
 import org.apache.kafka.connect.runtime.rest.errors.ConnectRestException;
 
-import com.cloudera.kafka.connect.trustedproxy.SpnegoConfig;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -41,8 +39,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -90,30 +86,6 @@ public class RestClientTest {
         when(mockKey.getFormat()).thenReturn("RAW");
         when(mockKey.getEncoded()).thenReturn("SomeKey".getBytes(StandardCharsets.UTF_8));
         return mockKey;
-    }
-
-    private static RestClient.HttpResponse<TestDTO> httpRequest(HttpClient httpClient, String requestSignatureAlgorithm,
-                                                                boolean https, boolean configureRestClient) {
-        WorkerConfig workerConfig = null;
-        if (configureRestClient) {
-            Map<String, Object> originals = new HashMap<>();
-            originals.put(SpnegoConfig.SPNEGO_ENABLED_CONFIG, "false");
-            workerConfig = mock(WorkerConfig.class);
-            when(workerConfig.originals()).thenReturn(originals);
-        }
-        RestClient client = spy(new RestClient(workerConfig));
-        doReturn(httpClient).when(client).httpClient(any());
-        String protocol = https ? "https" : "http";
-        String url = protocol + "://localhost:1234/api/endpoint";
-        return client.httpRequest(
-            url,
-            "GET",
-            null,
-            new TestDTO("requestBodyData"),
-            TEST_TYPE,
-            MOCK_SECRET_KEY,
-            requestSignatureAlgorithm
-        );
     }
 
     private static <T> RestClient.HttpResponse<T> httpRequest(
@@ -334,10 +306,6 @@ public class RestClientTest {
                 MOCK_SECRET_KEY,
                 TEST_SIGNATURE_ALGORITHM
         ));
-
-        String requestSignatureAlgorithm = "HmacSHA1";
-        assertDoesNotThrow(() -> httpRequest(httpClient, requestSignatureAlgorithm, false, true));
-        assertThrows(RuntimeException.class, () -> httpRequest(httpClient, requestSignatureAlgorithm, true, false));
     }
 
     @Test

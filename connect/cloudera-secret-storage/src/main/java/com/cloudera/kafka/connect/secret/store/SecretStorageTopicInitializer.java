@@ -17,6 +17,7 @@
 // Copyright (c) 2022 Cloudera, Inc. All rights reserved.
 package com.cloudera.kafka.connect.secret.store;
 
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -72,6 +73,7 @@ public class SecretStorageTopicInitializer {
     private final Map<String, Object> topicConfigs;
     private final int topicCreateRetries;
     private final int topicCreateBackoffMs;
+    private final long adminTimeoutMs;
     private final Map<EncryptionKeyCandidateKey, byte[]> candidates;
     private final Set<Integer> encryptionKeyVersions;
     private final SecretBundleMap<byte[]> unencryptedSecrets;
@@ -98,6 +100,9 @@ public class SecretStorageTopicInitializer {
         this.topicConfigs = topicConfigs;
         this.topicCreateRetries = topicCreateRetries;
         this.topicCreateBackoffMs = topicCreateBackoffMs;
+        this.adminTimeoutMs = Long.parseLong(adminConfigs
+                .getOrDefault(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "60000")
+                .toString());
         candidates = new LinkedHashMap<>();
         encryptionKeyVersions = new TreeSet<>(Collections.reverseOrder());
         unencryptedSecrets = new SecretBundleMap<>();
@@ -372,7 +377,7 @@ public class SecretStorageTopicInitializer {
 
     private void createTopicAndCheckConfig(TopicAdmin admin, NewTopic topicConfig) throws InterruptedException {
         Set<String> newTopics = admin.createTopicsWithRetry(topicConfig,
-                topicCreateRetries,
+                adminTimeoutMs,
                 topicCreateBackoffMs,
                 Time.SYSTEM
         );

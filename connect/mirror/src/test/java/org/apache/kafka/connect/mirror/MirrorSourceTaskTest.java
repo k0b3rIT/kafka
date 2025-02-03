@@ -361,7 +361,7 @@ public class MirrorSourceTaskTest {
         byte[] value1 = "fgh".getBytes();
         RecordHeaders recordHeaders = new RecordHeaders(new Header[0]);
         ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>(TOPIC_NAME, 0, 2, System.currentTimeMillis(),
-            TimestampType.CREATE_TIME, 0L, key1.length, value1.length, key1, value1, recordHeaders);
+            TimestampType.CREATE_TIME, key1.length, value1.length, key1, value1, recordHeaders, Optional.empty());
         Map<String, Long> expectedSourceOffsetsMap = new HashMap<>();
         expectedSourceOffsetsMap.put(SOURCE_CLUSTER_NAME, record.offset());
 
@@ -390,7 +390,7 @@ public class MirrorSourceTaskTest {
             new RecordHeader(MirrorSourceTask.SOURCE_OFFSET_HEADER_KEY, existingSourceOffsetRecord.serialize().array()),
         });
         ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>(TOPIC_NAME, 0, 2, System.currentTimeMillis(),
-            TimestampType.CREATE_TIME, 0L, key1.length, value1.length, key1, value1, recordHeaders);
+            TimestampType.CREATE_TIME, key1.length, value1.length, key1, value1, recordHeaders, Optional.empty());
         Map<String, Long> expectedSourceOffsetsMap = new HashMap<>(existingSourceOffsetRecord.sourceOffsets());
         expectedSourceOffsetsMap.put(SOURCE_CLUSTER_NAME, record.offset());
 

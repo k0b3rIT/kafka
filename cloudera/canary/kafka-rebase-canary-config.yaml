@@ -1,0 +1,93 @@
+canary:
+  email: viktor.somogyi@cloudera.com
+  id: ''
+  template_id: ''
+  template_name: ''
+  username: viktor.somogyi
+metadata:
+  slack_room:
+  - viktor.somogyi
+stacks:
+- build_env: rke
+  components:
+  # CDH build parts
+  - branch: cdh_main
+    comp_name: bigtop-new
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDH/bigtop-new.git
+    trigger_if_changed: true
+  - branch: kafka-rebase-3.9
+    comp_name: CDPD
+    enable_review: false
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDH/CDPD.git
+    trigger_if_changed: true
+    is_config_repo: true
+  # Kafka and related components
+  - branch: kafka-rebase-3.9
+    comp_name: kafka
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDH/kafka.git
+    trigger_if_changed: true
+  - branch: kafka-rebase-3.9
+    comp_name: kafka_connect_ext
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDF/kafka-connect-parent.git
+    trigger_if_changed: true
+  - branch: kafka-rebase-3.9
+    comp_name: streams_replication_manager
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDF/SRM.git
+    trigger_if_changed: true
+  - branch: kafka-rebase-3.9
+    comp_name: streams_messaging_manager
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDF/smm_server_private.git
+    trigger_if_changed: true
+  - branch: kafka-rebase-3.9
+    comp_name: cruise_control
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDF/cruise-control.git
+    trigger_if_changed: true
+  # Other components
+  - branch: kafka-rebase-3.9
+    comp_name: atlas
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDH/atlas.git
+    trigger_if_changed: true
+  - branch: kafka-rebase-3.9
+    comp_name: spark3
+    enable_review: false
+    gerrit_cr_pr: ''
+    git_sha: HEAD
+    git_url: git@github.infra.cloudera.com:CDH/spark3.git
+    trigger_if_changed: true
+  downstream_components: true
+  downstream_stacks: []
+  force_dag_build: true
+  gates:
+  - depends-on: []
+    name: build
+    vote: true
+  is_base: true
+  name: CDH
+  os:
+  - redhat8
+  python_tools: {}
+  release_branch: cdh_main
+  stack_name: CDH
+  tests: {}

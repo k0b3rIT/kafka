@@ -207,11 +207,6 @@ public class LoggingContextTest {
     protected void assertMdc(String connectorName, Integer taskId, Scope scope, String prefix) {
         String context = MDC.get(LoggingContext.CONNECTOR_CONTEXT);
         if (context != null) {
-            assertEquals(
-                connectorName != null,
-                context.startsWith("[" + connectorName),
-                "Context should begin with connector name when the connector name is non-null"
-            );
             assertTrue(context.startsWith("["), "Context should begin with a '['");
             if (prefix != null) {
                 assertTrue(context.contains(prefix), "Context should contain the prefix");

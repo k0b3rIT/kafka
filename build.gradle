@@ -67,27 +67,6 @@ plugins {
   id 'com.diffplug.spotless' version "6.14.0" apply false
 }
 
-dependencyCheck {
-  formats = ['HTML', 'JSON']
-  cve {
-    urlModified = 'http://kafka-toolshed.infra.cloudera.com/nvd/nvdcve-1.1-modified.json.gz'
-    urlBase = 'http://kafka-toolshed.infra.cloudera.com/nvd/nvdcve-1.1-%d.json.gz'
-    waitTime = 4000
-    startYear = 2002
-  }
-  analyzers {
-    nuspecEnabled = false
-    assemblyEnabled = false
-    msbuildEnabled = false
-    retirejs {
-      enabled = false
-    }
-    ossIndex {
-      enabled = false
-    }
-  }
-}
-
 ext {
   gradleVersion = versions.gradle
   minJavaVersion = 8

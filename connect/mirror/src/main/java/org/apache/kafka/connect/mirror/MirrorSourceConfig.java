@@ -125,10 +125,6 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
     public static final String REPLICATION_RECORDS_LAG_CALC_ENABLED = "replication.records.lag.calc" + ENABLED_SUFFIX;
     private static final String REPLICATION_RECORDS_LAG_CALC_ENABLED_DOC = "Whether to calculate replication records lag during MirrorSourceTask start and poll.";
     public static final boolean REPLICATION_RECORDS_LAG_CALC_ENABLED_DEFAULT = true;
-    public static final String REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS = "replication.records.lag.end.offset.timeout.ms";
-    private static final String REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DOC =
-            "Specifies the timeout (in milliseconds) for end offset calls of consumers during replication records lag calculation.";
-    public static final long REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DEFAULT = 60 * 1000L;
 
     public MirrorSourceConfig(Map<String, String> props) {
         super(CONNECTOR_CONFIG_DEF, ConfigUtils.translateDeprecatedConfigs(props, new String[][]{
@@ -242,10 +238,6 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
 
     boolean replicationRecordsLagCalcEnabled() {
         return getBoolean(REPLICATION_RECORDS_LAG_CALC_ENABLED);
-    }
-
-    public Duration replicationRecordsLagEndOffsetTimeout() {
-        return Duration.ofMillis(getLong(REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS));
     }
 
     boolean addSourceAliasToMetrics() {
@@ -403,13 +395,7 @@ public class MirrorSourceConfig extends MirrorConnectorConfig {
                         ConfigDef.Type.BOOLEAN,
                         REPLICATION_RECORDS_LAG_CALC_ENABLED_DEFAULT,
                         ConfigDef.Importance.LOW,
-                        REPLICATION_RECORDS_LAG_CALC_ENABLED_DOC)
-                .define(
-                        REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS,
-                        ConfigDef.Type.LONG,
-                        REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DEFAULT,
-                        ConfigDef.Importance.LOW,
-                        REPLICATION_RECORDS_LAG_END_OFFSET_TIMEOUT_MS_DOC);
+                        REPLICATION_RECORDS_LAG_CALC_ENABLED_DOC);
     }
 
     protected static final ConfigDef CONNECTOR_CONFIG_DEF = defineSourceConfig(new ConfigDef(BASE_CONNECTOR_CONFIG_DEF));

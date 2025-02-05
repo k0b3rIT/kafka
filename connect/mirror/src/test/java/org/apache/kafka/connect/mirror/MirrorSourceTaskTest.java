@@ -43,14 +43,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Semaphore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -78,7 +76,7 @@ public class MirrorSourceTaskTest {
         ConsumerRecord<byte[], byte[]> consumerRecord = new ConsumerRecord<>("topic1", 2, 3L, 4L,
             TimestampType.CREATE_TIME, 5, 6, key, value, headers, Optional.empty());
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(null, null, "cluster7",
-                new DefaultReplicationPolicy(), null, false, new ConcurrentHashMap<>(), 0L, new MockTime());
+                new DefaultReplicationPolicy(), null, false, 0L, new MockTime());
         SourceRecord sourceRecord = mirrorSourceTask.convertRecord(consumerRecord);
         assertEquals("cluster7.topic1", sourceRecord.topic(),
                 "Failure on cluster7.topic1 consumerRecord serde");
@@ -195,7 +193,7 @@ public class MirrorSourceTaskTest {
 
         ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(consumer, metrics, SOURCE_CLUSTER_NAME,
-                replicationPolicy, null, false, new ConcurrentHashMap<>(), 0L, new MockTime());
+                replicationPolicy, null, false, 0L, new MockTime());
         List<SourceRecord> sourceRecords = mirrorSourceTask.poll();
 
         assertEquals(2, sourceRecords.size());
@@ -255,7 +253,7 @@ public class MirrorSourceTaskTest {
         });
 
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(mockConsumer, null, null,
-                new DefaultReplicationPolicy(), null, false, new ConcurrentHashMap<TopicPartition, Long>(), 0L, new MockTime());
+                new DefaultReplicationPolicy(), null, false, 0L, new MockTime());
         mirrorSourceTask.initialize(mockSourceTaskContext);
 
         // Call test subject
@@ -274,7 +272,7 @@ public class MirrorSourceTaskTest {
                 .seek(new TopicPartition("previouslyReplicatedTopic1", 0), offsetToSeek);
 
         // Ensure that endOffsets is called.
-        verify(mockConsumer, times(1)).endOffsets(eq(topicPartitions), any());
+        verify(mockConsumer, times(topicPartitions.size())).currentLag(any());
 
         verifyNoMoreInteractions(mockConsumer);
     }
@@ -299,7 +297,7 @@ public class MirrorSourceTaskTest {
         String sourceClusterName = "cluster1";
         ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(consumer, metrics, sourceClusterName,
-                replicationPolicy, null, false, new ConcurrentHashMap<>(), 0L, new MockTime());
+                replicationPolicy, null, false, 0L, new MockTime());
 
         SourceRecord sourceRecord = mirrorSourceTask.convertRecord(new ConsumerRecord<>(topicName, 0, 0, System.currentTimeMillis(),
                 TimestampType.CREATE_TIME, key1.length, value1.length, key1, value1, headers, Optional.empty()));
@@ -333,7 +331,7 @@ public class MirrorSourceTaskTest {
         doNothing().when(offsetSyncWriter).promoteDelayedOffsetSyncs();
 
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(consumer, metrics, sourceClusterName,
-                replicationPolicy, offsetSyncWriter, false, new ConcurrentHashMap<>(), 0L, new MockTime());
+                replicationPolicy, offsetSyncWriter, false, 0L, new MockTime());
 
         SourceRecord sourceRecord = mirrorSourceTask.convertRecord(new ConsumerRecord<>(topicName, recordPartition,
                 recordOffset, System.currentTimeMillis(), TimestampType.CREATE_TIME, recordKey.length,
@@ -368,7 +366,7 @@ public class MirrorSourceTaskTest {
         ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
         @SuppressWarnings("unchecked")
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(mock(KafkaConsumer.class), mock(MirrorSourceMetrics.class),
-                SOURCE_CLUSTER_NAME, replicationPolicy, mock(OffsetSyncWriter.class), true, new ConcurrentHashMap<>(), 0L, new MockTime());
+                SOURCE_CLUSTER_NAME, replicationPolicy, mock(OffsetSyncWriter.class), true, 0L, new MockTime());
 
         org.apache.kafka.connect.header.Headers headers = mirrorSourceTask.convertHeaders(record);
 
@@ -397,7 +395,7 @@ public class MirrorSourceTaskTest {
         ReplicationPolicy replicationPolicy = new DefaultReplicationPolicy();
         @SuppressWarnings("unchecked")
         MirrorSourceTask mirrorSourceTask = new MirrorSourceTask(mock(KafkaConsumer.class), mock(MirrorSourceMetrics.class),
-                SOURCE_CLUSTER_NAME, replicationPolicy, mock(OffsetSyncWriter.class), true, new ConcurrentHashMap<>(), 0L, new MockTime());
+                SOURCE_CLUSTER_NAME, replicationPolicy, mock(OffsetSyncWriter.class), true, 0L, new MockTime());
 
         org.apache.kafka.connect.header.Headers headers = mirrorSourceTask.convertHeaders(record);
 
@@ -422,23 +420,20 @@ public class MirrorSourceTaskTest {
         commitRecords(mirrorSourceTask, partitionZeroSourceRecordOffset, partitionOneSourceRecordOffset);
 
         when(mockConsumer.poll(any())).thenReturn(new ConsumerRecords<>(new HashMap<>()));
-
-        long partitionZeroLEO = 200L;
-        long partitionOneLEO = 600L;
-        when(mockConsumer.endOffsets(any(), any())).thenReturn(logEndOffsetMap(partitionZeroLEO, partitionOneLEO));
+        when(mockConsumer.assignment()).thenReturn(new HashSet<>(Arrays.asList(partition(TOPIC_NAME, 0), partition(TOPIC_NAME, 1))));
+        when(mockConsumer.currentLag(partition(TOPIC_NAME, 0))).thenReturn(OptionalLong.of(1L));
+        when(mockConsumer.currentLag(partition(TOPIC_NAME, 1))).thenReturn(OptionalLong.of(234L));
 
         String downStreamTopicName = SOURCE_CLUSTER_NAME + "." + TOPIC_NAME;
         when(mockReplicationPolicy.formatRemoteTopic(eq(SOURCE_CLUSTER_NAME), eq(TOPIC_NAME))).thenReturn(downStreamTopicName);
         mirrorSourceTask.poll();
 
-        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 0)),
-                eq(partitionZeroLEO - partitionZeroSourceRecordOffset - 1));
-        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 1)),
-                eq(partitionOneLEO - partitionOneSourceRecordOffset - 1));
+        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 0)), eq(1L));
+        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 1)), eq(234L));
 
         // check if every poll calculate the replication-records-lag, when period of calculation is 0 ms
         mirrorSourceTask.poll();
-        verify(mockConsumer, times(2)).endOffsets(any(), any());
+        verify(mockConsumer, times(4)).currentLag(any());
     }
 
     @Test
@@ -454,24 +449,21 @@ public class MirrorSourceTaskTest {
         commitRecords(mirrorSourceTask, partitionZeroSourceRecordOffset, partitionOneSourceRecordOffset);
 
         when(mockConsumer.poll(any())).thenReturn(new ConsumerRecords<>(new HashMap<>()));
-
-        long partitionZeroLEO = 200L;
-        long partitionOneLEO = 600L;
-        when(mockConsumer.endOffsets(any(), any())).thenReturn(logEndOffsetMap(partitionZeroLEO, partitionOneLEO));
+        when(mockConsumer.assignment()).thenReturn(new HashSet<>(Arrays.asList(partition(TOPIC_NAME, 0), partition(TOPIC_NAME, 1))));
+        when(mockConsumer.currentLag(partition(TOPIC_NAME, 0))).thenReturn(OptionalLong.of(1L));
+        when(mockConsumer.currentLag(partition(TOPIC_NAME, 1))).thenReturn(OptionalLong.of(234L));
 
         String downStreamTopicName = SOURCE_CLUSTER_NAME + "." + TOPIC_NAME;
         when(mockReplicationPolicy.formatRemoteTopic(eq(SOURCE_CLUSTER_NAME), eq(TOPIC_NAME))).thenReturn(downStreamTopicName);
 
         // Firtly, the replication-records-lag will be calculated
         mirrorSourceTask.poll();
-        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 0)),
-                eq(partitionZeroLEO - partitionZeroSourceRecordOffset - 1));
-        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 1)),
-                eq(partitionOneLEO - partitionOneSourceRecordOffset - 1));
+        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 0)), eq(1L));
+        verify(mockMirrorMetrics).replicationRecordsLag(eq(partition(downStreamTopicName, 1)), eq(234L));
 
         // Secondly, the replication-records-lag calculation will be skipped due to the low frequency of calculation
         mirrorSourceTask.poll();
-        verify(mockConsumer, times(1)).endOffsets(any(), any());
+        verify(mockConsumer, times(2)).currentLag(any());
     }
 
     @Test
@@ -485,36 +477,25 @@ public class MirrorSourceTaskTest {
 
         mirrorSourceTask.poll();
 
-        verify(mockConsumer, never()).endOffsets(any(), any());
+        verify(mockConsumer, never()).currentLag(any());
     }
 
     @Test
     public void testReplicationRecordsLagMetricWithMultipleCalculationPeriod() {
+        TopicPartition tp = new TopicPartition(TOPIC_NAME, 0);
         @SuppressWarnings("unchecked")
         KafkaConsumer<byte[], byte[]> mockConsumer = (KafkaConsumer<byte[], byte[]>) mock(KafkaConsumer.class);
         MirrorSourceMetrics mockMirrorMetrics = mock(MirrorSourceMetrics.class);
         ReplicationPolicy mockReplicationPolicy = mock(ReplicationPolicy.class);
         MirrorSourceTask mirrorSourceTask = createMirrorSourceTask(mockConsumer, mockMirrorMetrics, mockReplicationPolicy, true, false);
         when(mockConsumer.poll(any())).thenReturn(new ConsumerRecords<>(new HashMap<>()));
+        when(mockConsumer.assignment()).thenReturn(Collections.singleton(tp));
 
         mirrorSourceTask.poll();
         mirrorSourceTask.poll();
         mirrorSourceTask.poll();
 
-        verify(mockConsumer, times(3)).endOffsets(any(), any());
-    }
-
-    @Test
-    @SuppressWarnings("ConstantConditions")
-    public void testReplicationRecordsLagCalc() {
-        assertNull(MirrorSourceTask.calcReplicationRecordsLag(0L, null));
-        assertNull(MirrorSourceTask.calcReplicationRecordsLag(10L, null));
-        assertNull(MirrorSourceTask.calcReplicationRecordsLag(0L, 0L));
-        assertNull(MirrorSourceTask.calcReplicationRecordsLag(0L, 9L));
-        assertNull(MirrorSourceTask.calcReplicationRecordsLag(10L, 10L));
-        assertEquals(0L, MirrorSourceTask.calcReplicationRecordsLag(10L, 9L));
-        assertEquals(1L, MirrorSourceTask.calcReplicationRecordsLag(10L, 8L));
-        assertEquals(4L, MirrorSourceTask.calcReplicationRecordsLag(10L, 5L));
+        verify(mockConsumer, times(3)).currentLag(tp);
     }
 
     private SourceRecord sourceRecord(TopicPartition partition, long offset) {
@@ -534,22 +515,6 @@ public class MirrorSourceTaskTest {
 
     private TopicPartition partition(String topic, int partition) {
         return new TopicPartition(topic, partition);
-    }
-
-    private ConcurrentMap<TopicPartition, Long> lastReplicatedOffsetMap(Long... lastReplicatedOffsetForPartition) {
-        ConcurrentMap<TopicPartition, Long> lroMap = new ConcurrentHashMap<>();
-        for (int i = 0; i < lastReplicatedOffsetForPartition.length; i++) {
-            lroMap.put(partition(i), lastReplicatedOffsetForPartition[i]);
-        }
-        return lroMap;
-    }
-
-    private Map<TopicPartition, Long> logEndOffsetMap(Long... logEndOffsetForPartition) {
-        Map<TopicPartition, Long> leoMap = new HashMap<>();
-        for (int i = 0; i < logEndOffsetForPartition.length; i++) {
-            leoMap.put(partition(i), logEndOffsetForPartition[i]);
-        }
-        return leoMap;
     }
 
     private void compareHeaders(List<Header> expectedHeaders, List<org.apache.kafka.connect.header.Header> taskHeaders) {
@@ -580,7 +545,7 @@ public class MirrorSourceTaskTest {
         OffsetSyncWriter offsetSyncWriter = mock(OffsetSyncWriter.class);
         when(offsetSyncWriter.maxOffsetLag()).thenReturn(50L);
         return new MirrorSourceTask(mockConsumer, mockMirrorMetrics, SOURCE_CLUSTER_NAME,
-            mockReplicationPolicy, offsetSyncWriter, true, lastReplicatedOffsetMap(100L, 500L),
+            mockReplicationPolicy, offsetSyncWriter, true,
             replicationRecordsLagCalcPeriodMs, new MockTime());
     }
 

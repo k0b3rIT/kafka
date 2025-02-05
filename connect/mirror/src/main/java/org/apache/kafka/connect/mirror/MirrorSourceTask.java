@@ -40,9 +40,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
@@ -63,8 +62,6 @@ public class MirrorSourceTask extends SourceTask {
     private Semaphore consumerAccess;
     private OffsetSyncWriter offsetSyncWriter;
     private boolean copySourceOffsetIntoHeader;
-    private ConcurrentMap<TopicPartition, Long> lastReplicatedOffsets;
-    private Duration replicationRecordsLagEndOffsetTimeout;
     private long replicationRecordsLagCalcPeriodMs;
     private boolean replicationRecordsLagCalcEnabled;
     private Instant lastRecordsLagEndOffsetQueryTime;
@@ -77,7 +74,7 @@ public class MirrorSourceTask extends SourceTask {
     // for testing
     MirrorSourceTask(KafkaConsumer<byte[], byte[]> consumer, MirrorSourceMetrics metrics, String sourceClusterAlias,
                      ReplicationPolicy replicationPolicy,
-                     OffsetSyncWriter offsetSyncWriter, boolean copySourceOffsetIntoHeader, ConcurrentMap<TopicPartition, Long> lastReplicatedOffsets,
+                     OffsetSyncWriter offsetSyncWriter, boolean copySourceOffsetIntoHeader,
                      long replicationRecordsLagCalcPeriodMs, Time currentTime) {
         this.consumer = consumer;
         this.metrics = metrics;
@@ -86,8 +83,6 @@ public class MirrorSourceTask extends SourceTask {
         consumerAccess = new Semaphore(1);
         this.offsetSyncWriter = offsetSyncWriter;
         this.copySourceOffsetIntoHeader = copySourceOffsetIntoHeader;
-        this.lastReplicatedOffsets = lastReplicatedOffsets;
-        this.replicationRecordsLagEndOffsetTimeout = Duration.ofMillis(60000L);
         this.replicationRecordsLagCalcPeriodMs = replicationRecordsLagCalcPeriodMs;
         this.replicationRecordsLagCalcEnabled = replicationRecordsLagCalcPeriodMs != -1;
         this.currentTime = currentTime;
@@ -97,7 +92,6 @@ public class MirrorSourceTask extends SourceTask {
     public void start(Map<String, String> props) {
         MirrorSourceTaskConfig config = new MirrorSourceTaskConfig(props);
         consumerAccess = new Semaphore(1);  // let one thread at a time access the consumer
-        replicationRecordsLagEndOffsetTimeout = config.replicationRecordsLagEndOffsetTimeout();
         replicationRecordsLagCalcPeriodMs = config.replicationRecordsLagCalcPeriodMs();
         replicationRecordsLagCalcEnabled = config.replicationRecordsLagCalcEnabled();
         sourceClusterAlias = config.sourceClusterAlias();
@@ -209,8 +203,6 @@ public class MirrorSourceTask extends SourceTask {
         TopicPartition sourceTopicPartition = MirrorUtils.unwrapPartition(record.sourcePartition());
         long upstreamOffset = MirrorUtils.unwrapOffset(record.sourceOffset());
         long downstreamOffset = metadata.offset();
-        lastReplicatedOffsets.compute(sourceTopicPartition, (k, v) ->
-            (v == null || upstreamOffset > v) ? Long.valueOf(upstreamOffset) : v);
         // Queue offset syncs only when offsetWriter is available
         if (offsetSyncWriter != null) {
             offsetSyncWriter.maybeQueueOffsetSyncs(sourceTopicPartition, upstreamOffset, downstreamOffset);
@@ -230,31 +222,19 @@ public class MirrorSourceTask extends SourceTask {
         }
 
         try {
-            Map<TopicPartition, Long> logEndOffsets = consumer.endOffsets(consumerAssignment, replicationRecordsLagEndOffsetTimeout);
-            for (Map.Entry<TopicPartition, Long> partitionLogEndOffset : logEndOffsets.entrySet()) {
-                TopicPartition partition = partitionLogEndOffset.getKey();
-                String downstreamTopicName = replicationPolicy.formatRemoteTopic(sourceClusterAlias, partition.topic());
-                TopicPartition downstreamPartition = new TopicPartition(downstreamTopicName, partition.partition());
-                Long recordLag = calcReplicationRecordsLag(partitionLogEndOffset.getValue(),
-                        lastReplicatedOffsets.get(partition));
-                if (recordLag != null) {
-                    metrics.replicationRecordsLag(downstreamPartition, recordLag);
-                }
-            }
-
             lastRecordsLagEndOffsetQueryTime = Instant.ofEpochMilli(currentTime.milliseconds());
+            for (TopicPartition tp : consumerAssignment) {
+                OptionalLong lag = consumer.currentLag(tp);
+                if (!lag.isPresent()) {
+                    continue;
+                }
+                String downstreamTopicName = replicationPolicy.formatRemoteTopic(sourceClusterAlias, tp.topic());
+                TopicPartition downstreamPartition = new TopicPartition(downstreamTopicName, tp.partition());
+                metrics.replicationRecordsLag(downstreamPartition, lag.getAsLong());
+            }
         } catch (Exception e) {
             log.warn("Replication-records-lag metric cannot be calculated: ", e);
         }
-    }
-
-    // visible for testing
-    static Long calcReplicationRecordsLag(long endOffset, Long lastReplicatedOffset) {
-        if (lastReplicatedOffset == null || lastReplicatedOffset >= endOffset) {
-            return null;
-        }
-        // endOffset points to last record + 1, to calc the lag, we need to subtract 1
-        return endOffset - 1 - lastReplicatedOffset;
     }
 
     private Map<TopicPartition, Long> loadOffsets(Set<TopicPartition> topicPartitions) {
@@ -270,7 +250,6 @@ public class MirrorSourceTask extends SourceTask {
     // visible for testing
     void initializeConsumer(Set<TopicPartition> taskTopicPartitions) {
         Map<TopicPartition, Long> topicPartitionOffsets = loadOffsets(taskTopicPartitions);
-        lastReplicatedOffsets = new ConcurrentHashMap<>(topicPartitionOffsets);
         consumer.assign(topicPartitionOffsets.keySet());
         log.info("Starting with {} previously uncommitted partitions.", topicPartitionOffsets.values().stream()
                 .filter(this::isUncommitted).count());

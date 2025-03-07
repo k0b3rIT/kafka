@@ -119,6 +119,7 @@ class UnifiedLog(@volatile var logStartOffset: Long,
   }
 
   this.logIdent = s"[UnifiedLog partition=$topicPartition, dir=$parentDir] "
+  private val futureTimestampLogger = new LogFutureTimestampLogger(logIdent)
 
   /* A lock that guards all modifications to the log */
   private val lock = new Object
@@ -1584,6 +1585,9 @@ class UnifiedLog(@volatile var logStartOffset: Long,
     val startMs = time.milliseconds
 
     def shouldDelete(segment: LogSegment, nextSegmentOpt: Option[LogSegment]): Boolean = {
+      if (startMs < segment.largestTimestamp()) {
+        futureTimestampLogger.warn(s"$segment contains future timestamp(s), making it ineligible to be deleted")
+      }
       startMs - segment.largestTimestamp > retentionMs
     }
 
@@ -2366,6 +2370,10 @@ object LogMetricNames {
   def allMetricNames: List[String] = {
     List(NumLogSegments, LogStartOffset, LogEndOffset, Size)
   }
+}
+
+class LogFutureTimestampLogger(parentLogIdent: String) extends Logging {
+  this.logIdent = parentLogIdent
 }
 
 case class RetentionMsBreach(log: UnifiedLog, remoteLogEnabledAndRemoteCopyEnabled: Boolean) extends SegmentDeletionReason {

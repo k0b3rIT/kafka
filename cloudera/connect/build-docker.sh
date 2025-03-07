@@ -17,11 +17,9 @@ image_name="kafka-connect-base"
 : ${TAGS:="latest"}
 : ${base_registry="docker-private.infra.cloudera.com/cloudera_base/"}
 
-tagging=""
+# we need to build every tag separately as build system wraps 'docker' command and transforms it to multi-arch building
 for tag in ${TAGS}; do
-  tagging="${tagging} -t ${REGISTRY}/${image_name}:${tag}"
+  docker build --build-arg base_registry="${base_registry}" -f "${docker_file}" -t "${REGISTRY}/${image_name}:${tag}" ./docker-tmp
 done
-
-docker build --build-arg base_registry="${base_registry}" -f "${docker_file}" ${tagging} ./docker-tmp
 
 rm -rf docker-tmp

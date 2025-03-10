@@ -93,7 +93,7 @@ versions += [
   checkstyle: "8.36.2",
   classgraph: "4.8.174",
   commonsCli: "1.4",
-  commonsIo: "2.14.0", // ZooKeeper dependency. Do not use, this is going away.
+  commonsIo: "2.17.0", // ZooKeeper dependency. Do not use, this is going away.
   commonsValidator: "1.7",
   dropwizardMetrics: "4.1.12.1",
   easymock: "4.3",

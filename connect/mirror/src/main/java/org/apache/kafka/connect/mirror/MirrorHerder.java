@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 
+import javax.ws.rs.core.UriBuilder;
+
 import static org.apache.kafka.connect.mirror.MirrorMaker.CONNECTOR_CLASSES;
 
 public class MirrorHerder extends DistributedHerder {
@@ -58,6 +60,16 @@ public class MirrorHerder extends DistributedHerder {
             wasLeader = true;
         } else {
             wasLeader = false;
+        }
+    }
+
+    @Override
+    protected UriBuilder namespacedUrl(String leaderUrl) {
+        if (leaderUrl.endsWith(MirrorMaker.NEW_REST_CLIENT_MARKER_SUFFIX)) {
+            String cleanLeaderUrl = leaderUrl.replace(MirrorMaker.NEW_REST_CLIENT_MARKER_SUFFIX, "");
+            return super.namespacedUrl(cleanLeaderUrl);
+        } else {
+            return UriBuilder.fromUri(leaderUrl);
         }
     }
 

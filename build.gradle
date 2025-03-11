@@ -3621,6 +3621,7 @@ project(':connect:mirror') {
     testImplementation libs.reload4j
     testImplementation libs.mockitoCore
     testImplementation libs.mockitoJunitJupiter
+    testImplementation libs.httpclient
     testImplementation project(':clients').sourceSets.test.output
     testImplementation project(':connect:runtime').sourceSets.test.output
     testImplementation project(':core')

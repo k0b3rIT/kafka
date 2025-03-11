@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -65,7 +66,15 @@ public class MirrorMakerConfig extends AbstractConfig {
     private static final String CLUSTERS_DOC = "List of cluster aliases.";
     public static final String CONFIG_PROVIDERS_CONFIG = WorkerConfig.CONFIG_PROVIDERS_CONFIG;
     private static final String CONFIG_PROVIDERS_DOC = "Names of ConfigProviders to use.";
-
+    public static final String REST_HOST_NAME_CONFIG = "mm.rest.host.name";
+    private static final String REST_HOST_NAME_DOC = "The host name of the Connect REST servers to bind on";
+    public static final String REST_PROTOCOL_CONFIG = "mm.rest.protocol";
+    private static final String REST_PROTOCOL_DOC = "The protocol to be used by the Connect REST servers, HTTP or HTTPS";
+    private static final String REST_PROTOCOL_DEFAULT = "http";
+    public static final String REST_SERVER_LEGACY_MODE_CONFIG = "mm.rest.server.legacy.mode";
+    private static final boolean REST_SERVER_LEGACY_MODE_DEFAULT = false;
+    private static final String REST_SERVER_LEGACY_MODE_DOC = "Enables legacy REST server mode." +
+            " (this mode used only during the rolling upgrade phase, set automatically by the CM upgrade handler, do not enable it manually).";
     public static final String MM_METRICS_SERVLET_ENABLE = "mm.metrics.servlet.enable";
     private static final String MM_METRICS_SERVLET_ENABLE_DOC = "Enable the metrics servlet for MM2";
     private static final Boolean MM_METRICS_SERVLET_ENABLE_DEFAULT = Boolean.FALSE;
@@ -116,6 +125,10 @@ public class MirrorMakerConfig extends AbstractConfig {
 
     public boolean enableInternalRest() {
         return getBoolean(ENABLE_INTERNAL_REST_CONFIG);
+    }
+
+    public boolean legacyRestServerModeEnabled() {
+        return getBoolean(REST_SERVER_LEGACY_MODE_CONFIG);
     }
 
     public List<SourceAndTarget> clusterPairs() {
@@ -213,6 +226,8 @@ public class MirrorMakerConfig extends AbstractConfig {
         // Other global worker configs
         props.putAll(stringsWithPrefixStripped(GLOBAL_WORKER_CONFIG_PREFIX));
 
+        props.putAll(stringsWithPrefix("listeners.https."));
+
         // Per-worker overrides
         props.putAll(stringsWithPrefixStripped(sourceAndTarget.source() + "->"
             + sourceAndTarget.target() + ".worker."));
@@ -233,6 +248,16 @@ public class MirrorMakerConfig extends AbstractConfig {
         props.putIfAbsent(KEY_CONVERTER_CLASS_CONFIG, BYTE_ARRAY_CONVERTER_CLASS); 
         props.putIfAbsent(VALUE_CONVERTER_CLASS_CONFIG, BYTE_ARRAY_CONVERTER_CLASS); 
         props.putIfAbsent(HEADER_CONVERTER_CLASS_CONFIG, BYTE_ARRAY_CONVERTER_CLASS);
+
+        // Providing a default listener for the rest server
+        // Listeners can be configured per-replication flow, but we need a sensible default
+        // The MM2 level config can be used to define the hostname and protocol for all of the servers in the process
+        String restListeners = props.get(RestServerConfig.LISTENERS_CONFIG);
+        if (restListeners == null || restListeners.isEmpty()) {
+            String hostname = getString(REST_HOST_NAME_CONFIG);
+            String protocol = getString(REST_PROTOCOL_CONFIG).toLowerCase(Locale.ROOT);
+            props.put(RestServerConfig.LISTENERS_CONFIG, protocol + "://" + hostname + ":0");
+        }
 
         props.put(WorkerConfig.METRIC_GROUPNAME_POSTFIX_CONFIG, "." + sourceAndTarget.source() + "__" + sourceAndTarget.target());
 
@@ -321,6 +346,18 @@ public class MirrorMakerConfig extends AbstractConfig {
                 .define(CLUSTERS_CONFIG, Type.LIST, Importance.HIGH, CLUSTERS_DOC)
                 .define(ENABLE_INTERNAL_REST_CONFIG, Type.BOOLEAN, false, Importance.HIGH, ENABLE_INTERNAL_REST_DOC)
                 .define(CONFIG_PROVIDERS_CONFIG, Type.LIST, Collections.emptyList(), Importance.LOW, CONFIG_PROVIDERS_DOC)
+                .define(REST_HOST_NAME_CONFIG, Type.STRING, "", Importance.MEDIUM, REST_HOST_NAME_DOC)
+                .define(REST_PROTOCOL_CONFIG,
+                        Type.STRING,
+                        REST_PROTOCOL_DEFAULT,
+                        ConfigDef.CaseInsensitiveValidString.in("http", "https"),
+                        Importance.MEDIUM,
+                        REST_PROTOCOL_DOC)
+                .define(REST_SERVER_LEGACY_MODE_CONFIG,
+                        Type.BOOLEAN,
+                        REST_SERVER_LEGACY_MODE_DEFAULT,
+                        Importance.LOW,
+                        REST_SERVER_LEGACY_MODE_DOC)
                 // security support
                 .define(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG,
                         Type.STRING,

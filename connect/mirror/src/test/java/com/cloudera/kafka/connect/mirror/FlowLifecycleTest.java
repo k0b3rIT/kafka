@@ -68,7 +68,7 @@ public class FlowLifecycleTest {
     public void setup() {
         checkExitNotCalled = true;
         Exit.setExitProcedure(mockExitCallback);
-        when(mockStarter.createHerder(any())).thenReturn(mockHerder);
+        when(mockStarter.createHerder(any(), any())).thenReturn(mockHerder);
     }
 
     @AfterEach
@@ -90,7 +90,7 @@ public class FlowLifecycleTest {
         lifecycle.start((a, b) -> { });
 
         verifyStartSync();
-        verifyTimeout(mockStarter).createHerder(eq(SOURCE_AND_TARGET));
+        verifyTimeout(mockStarter).createHerder(eq(SOURCE_AND_TARGET), any());
         verifyTimeout(mockHerder).start();
 
         lifecycle.stop();
@@ -107,7 +107,7 @@ public class FlowLifecycleTest {
     public void testCreateHerderFailsFirstTryThenSucceeds() {
         createLifecycle(2);
 
-        when(mockStarter.createHerder(any()))
+        when(mockStarter.createHerder(any(), any()))
                 .thenThrow(new RuntimeException("Test herder failure"))
                 .thenReturn(mockHerder);
 
@@ -116,7 +116,7 @@ public class FlowLifecycleTest {
         verifyStartSync();
         verifyTimeout(mockMetrics).removeHerderUrl(SOURCE_AND_TARGET.toString());
 
-        verifyTimeoutAndTimes(mockStarter, 2).createHerder(eq(SOURCE_AND_TARGET));
+        verifyTimeoutAndTimes(mockStarter, 2).createHerder(eq(SOURCE_AND_TARGET), any());
         verifyTimeout(mockHerder).start();
         verifyTimeoutAndTimes(mockExitCallback, 0).execute(anyInt(), anyString());
     }
@@ -136,6 +136,6 @@ public class FlowLifecycleTest {
 
     private void createLifecycle(int maxRetries) {
         lifecycle = new FlowLifecycle(SOURCE_AND_TARGET, mockStarter, mockMetrics, mockStartLatch, mockStopLatch,
-                maxRetries, RETRY_DELAY_MS);
+                maxRetries, RETRY_DELAY_MS, false);
     }
 }

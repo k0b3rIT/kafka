@@ -177,6 +177,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
     private final List<String> keySignatureVerificationAlgorithms;
     private final KeyGenerator keyGenerator;
     private final RestClient restClient;
+    private final String restUrl;
 
     // Visible for testing
     ExecutorService forwardRequestExecutor;
@@ -303,6 +304,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
         this.isTopicTrackingEnabled = config.getBoolean(TOPIC_TRACKING_ENABLE_CONFIG);
         this.restNamespace = Objects.requireNonNull(restNamespace);
         this.uponShutdown = Arrays.asList(uponShutdown);
+        this.restUrl = restUrl;
 
         String clientIdConfig = config.getString(CommonClientConfigs.CLIENT_ID_CONFIG);
         String clientId = clientIdConfig.isEmpty() ? "connect-" + workerId : clientIdConfig;
@@ -2829,7 +2831,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
         return false;
     }
 
-    private UriBuilder namespacedUrl(String workerUrl) {
+    protected UriBuilder namespacedUrl(String workerUrl) {
         UriBuilder result = UriBuilder.fromUri(workerUrl);
         for (String namespacePath : restNamespace) {
             result = result.path(namespacePath);
@@ -3050,5 +3052,9 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
         protected MetricGroup metricGroup() {
             return metricGroup;
         }
+    }
+
+    public String getRestUrl() {
+        return restUrl;
     }
 }

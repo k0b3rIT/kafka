@@ -29,6 +29,7 @@ import org.apache.kafka.connect.mirror.MirrorSourceConnector;
 import org.apache.kafka.connect.mirror.SourceAndTarget;
 import org.apache.kafka.connect.runtime.AbstractStatus;
 import org.apache.kafka.connect.runtime.distributed.DistributedConfig;
+import org.apache.kafka.connect.runtime.distributed.DistributedHerder;
 import org.apache.kafka.connect.runtime.distributed.RebalanceNeededException;
 import org.apache.kafka.connect.runtime.rest.entities.ConnectorStateInfo;
 import org.apache.kafka.connect.runtime.rest.entities.TaskInfo;
@@ -37,6 +38,12 @@ import org.apache.kafka.connect.util.FutureCallback;
 import org.apache.kafka.connect.util.clusters.EmbeddedKafkaCluster;
 import org.apache.kafka.test.NoRetryException;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -60,9 +67,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import javax.ws.rs.core.UriBuilder;
+
 import static org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG;
 import static org.apache.kafka.connect.mirror.MirrorMaker.CONNECTOR_CLASSES;
 import static org.apache.kafka.test.TestUtils.waitForCondition;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("integration")
@@ -377,6 +387,166 @@ public class DedicatedMirrorIntegrationTest {
             awaitTaskConfigurations(mirrorMakers.get("node 0"), MirrorSourceConnector.class, sourceAndTarget,
                     config -> newConfigValue.equals(config.get(MirrorSourceConfig.REFRESH_TOPICS_INTERVAL_SECONDS)));
         }
+    }
+
+    @Test
+    public void testRestServerWithLegacyAndNewRestNodesBothActive() throws Exception {
+        Properties brokerProps = new Properties();
+        brokerProps.put("transaction.state.log.replication.factor", "1");
+        brokerProps.put("transaction.state.log.min.isr", "1");
+        EmbeddedKafkaCluster clusterA = startKafkaCluster("A", 1, brokerProps);
+        EmbeddedKafkaCluster clusterB = startKafkaCluster("B", 1, brokerProps);
+
+        try (Admin adminB = clusterB.createAdminClient()) {
+            // Cluster aliases
+            final String a = "A";
+            // Use a convoluted cluster name to ensure URL encoding/decoding works
+            final String b = "B";
+            final String ab = a + "->" + b;
+            final String ba = b + "->" + a;
+            final String testTopicPrefix = "test-topic-";
+
+            Map<String, String> mmProps = new HashMap<String, String>() {{
+                    put("dedicated.mode.enable.internal.rest", "true");
+                    put("listeners", "http://localhost:0");
+                    // Refresh topics very frequently to quickly pick up on topics that are created
+                    // after the MM2 nodes are brought up during testing
+                    put(MirrorSourceConfig.REFRESH_TOPICS_INTERVAL_SECONDS, "1");
+                    put("clusters", String.join(", ", a, b));
+                    put(a + ".bootstrap.servers", clusterA.bootstrapServers());
+                    put(b + ".bootstrap.servers", clusterB.bootstrapServers());
+                    // Enable exactly-once support to both validate that MirrorMaker can run with
+                    // that feature turned on, and to force cross-worker communication before
+                    // task startup
+                    put(b + ".exactly.once.source.support", "enabled");
+                    put(a + ".consumer.isolation.level", "read_committed");
+                    put(ab + ".enabled", "true");
+                    put(ab + ".topics", "^" + testTopicPrefix + ".*");
+                    // The name of the offset syncs topic will contain the name of the cluster in
+                    // the replication flow that it is _not_ hosted on; create the offset syncs topic
+                    // on the target cluster so that its name will contain the source cluster's name
+                    // (since the target cluster's name contains characters that are not valid for
+                    // use in a topic name)
+                    put(ab + ".offset-syncs.topic.location", "target");
+                    // Disable b -> a (and heartbeats from it) so that no topics are created that use
+                    // the target cluster's name
+                    put(ba + ".enabled", "false");
+                    put(ba + ".emit.heartbeats.enabled", "false");
+                    put("replication.factor", "1");
+                    put("checkpoints.topic.replication.factor", "1");
+                    put("heartbeats.topic.replication.factor", "1");
+                    put("offset-syncs.topic.replication.factor", "1");
+                    put("offset.storage.replication.factor", "1");
+                    put("status.storage.replication.factor", "1");
+                    put("config.storage.replication.factor", "1");
+                    // For the multi-node case, we wait for reassignment so shorten the delay period.
+                    put(a + "." + DistributedConfig.SCHEDULED_REBALANCE_MAX_DELAY_MS_CONFIG, "1000");
+                    put(b + "." + DistributedConfig.SCHEDULED_REBALANCE_MAX_DELAY_MS_CONFIG, "1000");
+                    put("mm.replication.restart.count", "5");
+                    put("mm.replication.restart.delay.ms", "5000");
+                    put("mm.rest.server.legacy.mode", "true");
+                    put("mm.rest.host.name", "localhost");
+                }};
+
+            final int numNodes = 3;
+            HashMap<Integer, Map<String, String>> perNodeProps = new HashMap<>();
+            for (int i = 0; i < numNodes; i++) {
+                perNodeProps.put(i, new HashMap<>(mmProps));
+            }
+
+            perNodeProps.get(2).put("mm.rest.server.legacy.mode", "false"); // New rest server dedicated mode
+
+            final SourceAndTarget sourceAndTarget = new SourceAndTarget(a, b);
+            // Bring up a three-node cluster
+
+            for (int i = 0; i < numNodes; i++) {
+                startMirrorMaker("node " + i, perNodeProps.get(i));
+            }
+
+            // wait for mirror maker to start
+            for (int i = 0; i < numNodes; i++) {
+
+                awaitMirrorMakerStart(mirrorMakers.get("node " + i), sourceAndTarget);
+                String restUrl = ((DistributedHerder) mirrorMakers.get("node " + i).getStartedHerders().get(sourceAndTarget)).getRestUrl();
+                try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+                    String connectorsUrl = createUriBuilderFromLeaderUrl(restUrl, sourceAndTarget).path("connectors").build().toString();
+                    HttpResponse response = client.execute(new HttpGet(connectorsUrl));
+                    // Validate that the response is successful, and the rest server is available
+                    HttpEntity entity = response.getEntity();
+                    String responseString = EntityUtils.toString(entity, "UTF-8");
+                    if (response.getStatusLine().getStatusCode() == 404) { //The new REST server is not exposing the connectors endpoint
+                        assertEquals("{\"error_code\":404,\"message\":\"HTTP 404 Not Found\"}", responseString);
+                        // If the rest server is not available, but the response contains the expected 404
+                        // json message from the rest server, than the Rest server is up and running
+                    } else {
+                        assertEquals(200, response.getStatusLine().getStatusCode());
+                    }
+                }
+            }
+
+            String restUrl = ((DistributedHerder) mirrorMakers.get("node 2").getStartedHerders().get(sourceAndTarget)).getRestUrl();
+            assertTrue(restUrl.endsWith(MirrorMaker.NEW_REST_CLIENT_MARKER_SUFFIX));
+
+
+            // wait for heartbeat connector to start running
+            awaitConnectorTasksStart(mirrorMakers.get("node 0"), MirrorHeartbeatConnector.class, sourceAndTarget);
+
+            final int messagesPerTopic = 10;
+            // Create one topic per Kafka cluster per MirrorMaker node
+            for (int i = 0; i < numNodes; i++) {
+                String topic = testTopicPrefix + i;
+
+                // Create the topic on cluster A
+                clusterA.createTopic(topic, 1);
+                // and wait for MirrorMaker to create it on cluster B
+                awaitTopicCreation(b, adminB, a + "." + topic);
+
+                // wait for source connector to start running
+                awaitConnectorTasksStart(mirrorMakers.get("node " + i), MirrorSourceConnector.class, sourceAndTarget);
+
+                // Write data to the topic on cluster A
+                writeToTopic(clusterA, topic, messagesPerTopic);
+                // and wait for MirrorMaker to copy it to cluster B
+                awaitTopicContent(clusterB, b, a + "." + topic, messagesPerTopic);
+            }
+
+            // Perform a rolling restart of the cluster with a new configuration
+            String newConfigValue = "2";
+
+            for (int i = 0; i < numNodes; i++) {
+                perNodeProps.get(i).put(MirrorSourceConfig.REFRESH_TOPICS_INTERVAL_SECONDS, newConfigValue);
+            }
+
+            for (int i = 0; i < numNodes; i++) {
+                stopMirrorMaker("node " + i);
+                MirrorMaker any = mirrorMakers.values().stream().findAny().get();
+                // Wait for the cluster finish the reassignment and rebalance before bringing up the next node.
+                awaitConnectorTasksStart(any, MirrorHeartbeatConnector.class, sourceAndTarget);
+                awaitConnectorTasksStart(any, MirrorSourceConnector.class, sourceAndTarget);
+                startMirrorMaker("node " + i, perNodeProps.get(i));
+                awaitMirrorMakerStart(mirrorMakers.get("node " + i), sourceAndTarget);
+            }
+            // Assert that the new configuration is propagated
+            awaitTaskConfigurations(mirrorMakers.get("node 0"), MirrorSourceConnector.class, sourceAndTarget,
+                    config -> newConfigValue.equals(config.get(MirrorSourceConfig.REFRESH_TOPICS_INTERVAL_SECONDS)));
+        }
+    }
+
+    private UriBuilder createUriBuilderFromLeaderUrl(String leaderUrl, SourceAndTarget sourceAndTarget) {
+        if (leaderUrl.endsWith(MirrorMaker.NEW_REST_CLIENT_MARKER_SUFFIX)) {
+            String cleanLeaderUrl = leaderUrl.replace(MirrorMaker.NEW_REST_CLIENT_MARKER_SUFFIX, "");
+            return namespacedUrl(cleanLeaderUrl, sourceAndTarget);
+        } else {
+            return UriBuilder.fromUri(leaderUrl);
+        }
+    }
+
+    protected UriBuilder namespacedUrl(String workerUrl, SourceAndTarget sourceAndTarget) {
+        UriBuilder result = UriBuilder.fromUri(workerUrl);
+        for (String namespacePath : Arrays.asList(sourceAndTarget.source(), sourceAndTarget.target())) {
+            result = result.path(namespacePath);
+        }
+        return result;
     }
 
     private void awaitTopicCreation(String clusterName, Admin admin, String topic) throws Exception {

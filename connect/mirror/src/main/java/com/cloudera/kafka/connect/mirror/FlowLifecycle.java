@@ -22,6 +22,7 @@ import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.mirror.MirrorMaker;
 import org.apache.kafka.connect.mirror.SourceAndTarget;
 import org.apache.kafka.connect.runtime.Herder;
+import org.apache.kafka.connect.runtime.rest.ConnectRestServer;
 
 import com.cloudera.kafka.connect.mirror.utils.RetryStatus;
 import com.cloudera.kafka.connect.mirror.utils.RingBuffer;
@@ -46,14 +47,16 @@ public class FlowLifecycle {
     private final CountDownLatch stopLatch;
     private final int maxTries;
     private final long delayMs;
+    private final boolean legacyRestServerModeEnabled;
     private final RingBuffer<RetryStatus> herderStatus;
     private final ExecutorService executor;
     private Herder herder;
     private boolean stopped = false;
     private boolean stopLatchInvoked = false;
+    private ConnectRestServer restServer;
 
     public FlowLifecycle(SourceAndTarget flow, MirrorMaker.MirrorMakerStarter mm, MirrorMakerMetrics metrics,
-                         CountDownLatch startLatch, CountDownLatch stopLatch, int maxTries, long delayMs) {
+                         CountDownLatch startLatch, CountDownLatch stopLatch, int maxTries, long delayMs, boolean legacyRestServerModeEnabled) {
         this.flow = flow;
         this.mm = mm;
         this.metrics = metrics;
@@ -61,6 +64,7 @@ public class FlowLifecycle {
         this.stopLatch = stopLatch;
         this.maxTries = maxTries;
         this.delayMs = delayMs;
+        this.legacyRestServerModeEnabled = legacyRestServerModeEnabled;
         herderStatus = RingBuffer.of(new RetryStatus[HISTORY_SIZE], RetryStatus.UNKNOWN);
         executor = Executors.newSingleThreadExecutor(r -> new Thread(r, "mm-lifecycle-start-" + flow));
     }
@@ -155,8 +159,19 @@ public class FlowLifecycle {
         }
 
         try {
-            herder = mm.createHerder(flow);
+            if (legacyRestServerModeEnabled) {
+                restServer = mm.createRestServer(flow);
+            }
+            herder = mm.createHerder(flow, legacyRestServerModeEnabled ? restServer.advertisedUrl() : null);
+
             herder.start();
+
+            if (legacyRestServerModeEnabled) {
+                restServer.initializeResources(herder);
+
+                //herder URL metrics
+                metrics.herderUrl(flow.toString(), restServer.advertisedUrl().toString());
+            }
         } catch (Exception e) {
             metrics.removeHerderUrl(flow.toString());
             closeComponentsQuietly();
@@ -174,6 +189,10 @@ public class FlowLifecycle {
     }
 
     private void closeComponentsQuietly() {
+        if (legacyRestServerModeEnabled && restServer != null) {
+            Utils.closeQuietly(restServer::stop, "RestServer of flow " + flow);
+            restServer = null;
+        }
         if (herder != null) {
             Utils.closeQuietly(herder::stop, "Herder of flow " + flow);
             herder = null;

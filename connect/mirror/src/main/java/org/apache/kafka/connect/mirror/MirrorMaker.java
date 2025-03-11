@@ -33,6 +33,7 @@ import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.WorkerConfigTransformer;
 import org.apache.kafka.connect.runtime.distributed.DistributedConfig;
 import org.apache.kafka.connect.runtime.isolation.Plugins;
+import org.apache.kafka.connect.runtime.rest.ConnectRestServer;
 import org.apache.kafka.connect.runtime.rest.RestClient;
 import org.apache.kafka.connect.runtime.rest.entities.ConnectorStateInfo;
 import org.apache.kafka.connect.runtime.rest.entities.TaskInfo;
@@ -61,7 +62,10 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,10 +75,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
+import javax.ws.rs.core.UriBuilder;
 
 import static org.apache.kafka.clients.CommonClientConfigs.CLIENT_ID_CONFIG;
 
@@ -110,6 +117,16 @@ public class MirrorMaker {
 
     private static final long SHUTDOWN_TIMEOUT_SECONDS = 60L;
 
+    /*
+        This a leaderUrl postfix, a temporary solution we used,
+        to be able to identify the rest server implementation during a rolling upgrade.
+        This should be removed in the future.
+        Removing this and the associated changes makes safe rolling upgrade impossible,
+        if you upgrade from the old rest server implementation to the new one.
+        Because the workers could not communicate (reconfig, fencing) with the leader via the REST API during the upgrade
+    */
+    public static final String NEW_REST_CLIENT_MARKER_SUFFIX = "/v2";
+
     public static final List<Class<?>> CONNECTOR_CLASSES = Collections.unmodifiableList(
         Arrays.asList(
             MirrorSourceConnector.class,
@@ -121,7 +138,7 @@ public class MirrorMaker {
     private CountDownLatch stopLatch;
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
     private final ShutdownHook shutdownHook;
-    private final String advertisedUrl;
+    private final URI advertisedUrl;
     private final Time time;
     private final MirrorMakerConfig config;
     private final Set<String> clusters;
@@ -144,16 +161,26 @@ public class MirrorMaker {
     public MirrorMaker(MirrorMakerConfig config, List<String> clusters, Time time) {
         log.debug("Kafka MirrorMaker instance created");
         this.time = time;
-        if (config.enableInternalRest()) {
+        if (config.legacyRestServerModeEnabled()) {
+            log.warn("Starting in legacy REST server mode (separate REST server for each herder). This should happen only during the rolling upgrade. " +
+                    "If you see this message in normal operation that means the upgrade process is not finished. " +
+                    "You have to disable the legacy mode in the configuration, by removing the " + MirrorMakerConfig.REST_SERVER_LEGACY_MODE_CONFIG + " property.");
+            this.restClient = new RestClient(config);
+            internalServer = null;
+            this.advertisedUrl = UriBuilder.fromUri("NOTUSED").build();
+        } else if (config.enableInternalRest()) {
+            log.info("Starting in new REST server mode (single REST server for all herders)");
             this.restClient = new RestClient(config);
             internalServer = new MirrorRestServer(config.originals(), restClient);
             internalServer.initializeServer();
-            this.advertisedUrl = internalServer.advertisedUrl().toString();
+            this.advertisedUrl = UriBuilder.fromUri(internalServer.advertisedUrl()).path(NEW_REST_CLIENT_MARKER_SUFFIX).build();
         } else {
-            internalServer = null;
+            log.info("Starting without REST server");
             restClient = null;
-            this.advertisedUrl = "NOTUSED";
+            internalServer = null;
+            this.advertisedUrl = UriBuilder.fromUri("NOTUSED").build();
         }
+
         this.config = config;
         if (clusters != null && !clusters.isEmpty()) {
             this.clusters = new HashSet<>(clusters);
@@ -249,7 +276,24 @@ public class MirrorMaker {
         }
     }
 
-    private Herder createHerder(SourceAndTarget sourceAndTarget) {
+    private String generateWorkerId(SourceAndTarget sourceAndTarget, URI advertisedUrlForLegacyRestApi, URI advertisedUrlForNewRestApi) {
+        String sourceAndTargetStr = sourceAndTarget.source() + "__" + sourceAndTarget.target();
+        if (config.legacyRestServerModeEnabled()) {
+            return advertisedUrlForLegacyRestApi.getHost() + ":" + advertisedUrlForLegacyRestApi.getPort() + "/" + sourceAndTargetStr;
+        }
+
+        if (config.enableInternalRest()) {
+            return advertisedUrlForNewRestApi.getHost() + ":" + advertisedUrlForNewRestApi.getPort() + "/" + sourceAndTargetStr;
+        }
+
+        try {
+            return InetAddress.getLocalHost().getHostName() + "/" + sourceAndTargetStr + "/" + UUID.randomUUID();
+        } catch (UnknownHostException e) {
+            return sourceAndTargetStr + "/" + UUID.randomUUID();
+        }
+    }
+
+    private Herder createHerder(SourceAndTarget sourceAndTarget, URI advertisedUrlForLegacyRestApi) {
         log.info("creating herder for " + sourceAndTarget.toString());
         List<String> restNamespace;
         try {
@@ -259,7 +303,8 @@ public class MirrorMaker {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException("Unable to create encoded URL paths for source and target using UTF-8", e);
         }
-        String workerId = sourceAndTarget.toString();
+
+        String workerId = generateWorkerId(sourceAndTarget, advertisedUrlForLegacyRestApi, advertisedUrl);
         Plugins plugins = new Plugins(workerConfigMap.get(sourceAndTarget));
         plugins.compareAndSwapWithDelegatingLoader();
         DistributedConfig distributedConfig = distributedConfigMap.get(sourceAndTarget);
@@ -292,7 +337,7 @@ public class MirrorMaker {
         // tracking the various shared admin objects in this class.
         Herder herder = new MirrorHerder(config, sourceAndTarget, distributedConfig, time, worker,
                 kafkaClusterId, statusBackingStore, configBackingStore,
-                advertisedUrl, restClient, clientConfigOverridePolicy,
+                advertisedUrlForLegacyRestApi != null ? advertisedUrlForLegacyRestApi.toString() : advertisedUrl.toString(), restClient, clientConfigOverridePolicy,
                 restNamespace, sharedAdmin);
         return herder;
     }
@@ -313,6 +358,7 @@ public class MirrorMaker {
     private class ShutdownHook extends Thread {
         @Override
         public void run() {
+            log.info("Kafka MirrorMaker shutdown hook called");
             try {
                 if (!startLatch.await(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     log.error("Timed out in shutdown hook waiting for MirrorMaker startup to finish. Unable to shutdown cleanly.");
@@ -338,6 +384,10 @@ public class MirrorMaker {
     public void taskConfigs(SourceAndTarget sourceAndTarget, String connector, Callback<List<TaskInfo>> cb) {
         checkHerder(sourceAndTarget);
         startedHerders.get(sourceAndTarget).taskConfigs(connector, cb);
+    }
+
+    public Map<SourceAndTarget, Herder> getStartedHerders() {
+        return startedHerders;
     }
 
     public static void main(String[] args) {
@@ -398,8 +448,16 @@ public class MirrorMaker {
             starters = new HashMap<>();
         }
 
-        public Herder createHerder(SourceAndTarget sourceAndTarget) {
-            return MirrorMaker.this.createHerder(sourceAndTarget);
+        public ConnectRestServer createRestServer(SourceAndTarget sourceAndTarget) {
+            DistributedConfig distributedConfig = distributedConfigMap.get(sourceAndTarget);
+            RestClient restClient = new RestClient(distributedConfig);
+            ConnectRestServer rest = new ConnectRestServer(distributedConfig.rebalanceTimeout(), restClient, distributedConfig.originals());
+            rest.initializeServer();
+            return rest;
+        }
+
+        public Herder createHerder(SourceAndTarget sourceAndTarget, URI advertisedUrl) {
+            return MirrorMaker.this.createHerder(sourceAndTarget, advertisedUrl);
         }
 
         synchronized void start(Set<SourceAndTarget> flows, KafkaFuture.BiConsumer<SourceAndTarget, Herder> onFlowStarted) {
@@ -429,7 +487,7 @@ public class MirrorMaker {
 
         private void startFlow(SourceAndTarget sourceAndTarget, KafkaFuture.BiConsumer<SourceAndTarget, Herder> onFlowStarted) {
             FlowLifecycle starter = new FlowLifecycle(sourceAndTarget, this, metrics, startLatch, stopLatch,
-                    maxTries, delayMs);
+                    maxTries, delayMs, MirrorMaker.this.config.legacyRestServerModeEnabled());
             starters.put(sourceAndTarget, starter);
             starter.start(onFlowStarted);
         }
@@ -452,6 +510,10 @@ public class MirrorMaker {
                 // should never really be thrown
                 log.error("Unexpected IOException during stopping metrics servlet.", e);
             }
+        }
+
+        public MirrorMakerMetrics getMetrics() {
+            return metrics;
         }
     }
 

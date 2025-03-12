@@ -110,7 +110,7 @@ public class MirrorMaker {
 
     public static final List<Class<?>> CONNECTOR_CLASSES = List.of(MirrorSourceConnector.class, MirrorHeartbeatConnector.class, MirrorCheckpointConnector.class);
 
-    private final Map<SourceAndTarget, Herder> herders = new HashMap<>();
+    private final Map<SourceAndTarget, MirrorHerder> herders = new HashMap<>();
     private CountDownLatch startLatch;
     private CountDownLatch stopLatch;
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
@@ -277,7 +277,7 @@ public class MirrorMaker {
         // Pass the shared admin to the distributed herder as an additional AutoCloseable object that should be closed when the
         // herder is stopped. MirrorMaker has multiple herders, and having the herder own the close responsibility is much easier than
         // tracking the various shared admin objects in this class.
-        Herder herder = new MirrorHerder(config, sourceAndTarget, distributedConfig, time, worker,
+        MirrorHerder herder = new MirrorHerder(config, sourceAndTarget, distributedConfig, time, worker,
                 kafkaClusterId, statusBackingStore, configBackingStore,
                 advertisedUrl.toString(), restClient, clientConfigOverridePolicy,
                 restNamespace, sharedAdmin);

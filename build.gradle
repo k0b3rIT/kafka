@@ -3650,6 +3650,7 @@ project(':connect:mirror') {
     implementation project(':connect:api')
     implementation project(':connect:runtime')
     implementation project(':connect:mirror-client')
+    implementation project(':connect:basic-auth-extension')
     implementation project(':clients')
 
     implementation libs.argparse4j

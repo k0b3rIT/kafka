@@ -18,17 +18,22 @@ package org.apache.kafka.connect.mirror;
 
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
+import org.apache.kafka.connect.runtime.HerderRequest;
 import org.apache.kafka.connect.runtime.Worker;
+import org.apache.kafka.connect.runtime.WorkerConnector;
 import org.apache.kafka.connect.runtime.distributed.DistributedConfig;
 import org.apache.kafka.connect.runtime.distributed.DistributedHerder;
+import org.apache.kafka.connect.runtime.distributed.NotAssignedException;
 import org.apache.kafka.connect.runtime.distributed.NotLeaderException;
 import org.apache.kafka.connect.runtime.rest.RestClient;
 import org.apache.kafka.connect.storage.ConfigBackingStore;
 import org.apache.kafka.connect.storage.StatusBackingStore;
 
+import org.apache.kafka.connect.util.Callback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,6 +51,53 @@ public class MirrorHerder extends DistributedHerder {
         super(config, time, worker, kafkaClusterId, statusBackingStore, configBackingStore, restUrl, restClient, connectorClientConfigOverridePolicy, restNamespace, uponShutdown);
         this.config = mirrorConfig;
         this.sourceAndTarget = sourceAndTarget;
+    }
+
+    public HerderRequest getHerderStat(Callback<Map<String, Object>> callback) {
+        return addRequest(
+                0,
+                () -> {
+                    WorkerConnector workerConnector = worker.getConnector("MirrorSourceConnector");
+                    if (workerConnector == null) {
+                        String forwardUrl = !isLeader()?leaderUrl():member.ownerUrl("MirrorSourceConnector");
+                        callback.onCompletion(new NotAssignedException("Cannot read replicated topics since the connector is not assigned to this member", forwardUrl), null);
+                        return null;
+                    }
+
+                    MirrorSourceConnector mirrorSourceConnector = ((MirrorSourceConnector) workerConnector.connector());
+
+                    callback.onCompletion(null, getHerderStat(mirrorSourceConnector));
+                    return null;
+                },
+                forwardErrorAndTickThreadStages(callback));
+    }
+
+    public Map<String, Object> herderDetails(SourceAndTarget sourceAndTarget) {
+        HashMap<String, Object> out = new HashMap<>();
+        out.put("enabled", isEnabled(sourceAndTarget));
+        out.put("isReady", isReady());
+        out.put("source", sourceAndTarget.source());
+        out.put("target", sourceAndTarget.target());
+        return out;
+    }
+
+    private boolean isEnabled(SourceAndTarget sourceAndTarget) {
+        return Boolean.parseBoolean((String) config.originals().get(sourceAndTarget.source() + "->" + sourceAndTarget.target() + ".enabled"));
+    }
+    private Map<String, Object> getHerderStat(MirrorSourceConnector mirrorSourceConnector) {
+        HashMap<String, Object> links = new HashMap<>();
+        links.put("connectors", "/"+sourceAndTarget.source()+"/"+sourceAndTarget.target()+"/connectors");
+        Map<String, Object> out = herderDetails(sourceAndTarget);
+        out.put("replicatedTopics", mirrorSourceConnector.topicsBeingReplicated());
+        out.put("MirrorHeartbeatConnector", connectorStatus("MirrorHeartbeatConnector").connector().state());
+        out.put("MirrorCheckpointConnector", connectorStatus("MirrorCheckpointConnector").connector().state());
+        out.put("MirrorSourceConnector", connectorStatus("MirrorSourceConnector").connector().state());
+        out.put("MirrorSourceTasksRunning", connectorStatus("MirrorSourceConnector").tasks().stream().filter(t->t.state().equals("RUNNING")).count());
+        out.put("MirrorHeartbeatTaskRunning", connectorStatus("MirrorHeartbeatConnector").tasks().stream().filter(t->t.state().equals("RUNNING")).count());
+        out.put("MirrorCheckpointTaskRunning", connectorStatus("MirrorCheckpointConnector").tasks().stream().filter(t->t.state().equals("RUNNING")).count());
+        out.put("links", links);
+
+        return out;
     }
 
     @Override

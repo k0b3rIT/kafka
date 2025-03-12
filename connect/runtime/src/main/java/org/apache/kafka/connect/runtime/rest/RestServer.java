@@ -26,6 +26,7 @@ import org.apache.kafka.connect.rest.ConnectRestExtensionContext;
 import org.apache.kafka.connect.runtime.Herder;
 import org.apache.kafka.connect.runtime.health.ConnectClusterDetailsImpl;
 import org.apache.kafka.connect.runtime.health.ConnectClusterStateImpl;
+import org.apache.kafka.connect.runtime.isolation.Plugins;
 import org.apache.kafka.connect.runtime.rest.errors.ConnectExceptionMapper;
 import org.apache.kafka.connect.runtime.rest.util.SSLUtils;
 
@@ -61,6 +62,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -502,6 +504,37 @@ public abstract class RestServer {
         }
 
         return null;
+    }
+
+    protected final void registerRestExtensions(Plugins plugins, ResourceConfig resourceConfig) {
+        connectRestExtensionPlugins = Plugin.wrapInstances(
+                plugins.newPlugins(
+                        config.restExtensions(),
+                        config,
+                        ConnectRestExtension.class
+                ),
+                null,
+                RestServerConfig.REST_EXTENSION_CLASSES_CONFIG);
+
+        long herderRequestTimeoutMs = DEFAULT_REST_REQUEST_TIMEOUT_MS;
+
+        Integer rebalanceTimeoutMs = config.rebalanceTimeoutMs();
+
+        if (rebalanceTimeoutMs != null) {
+            herderRequestTimeoutMs = Math.min(herderRequestTimeoutMs, rebalanceTimeoutMs.longValue());
+        }
+
+
+
+        ConnectRestExtensionContext connectRestExtensionContext =
+                new ConnectRestExtensionContextImpl(
+                        new ConnectRestConfigurable(resourceConfig),
+                        null
+                );
+        for (Plugin<ConnectRestExtension> connectRestExtensionPlugin : connectRestExtensionPlugins) {
+            connectRestExtensionPlugin.get().register(connectRestExtensionContext);
+        }
+
     }
 
     protected final void registerRestExtensions(Herder herder, ResourceConfig resourceConfig) {

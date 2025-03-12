@@ -401,7 +401,7 @@ public class MirrorSourceConnector extends SourceConnector {
         knownTargetTopicPartitions = findTargetTopicPartitions();
     }
 
-    private Set<String> topicsBeingReplicated() {
+    public Set<String> topicsBeingReplicated() {
         Set<String> knownTargetTopics = toTopics(knownTargetTopicPartitions);
         return knownSourceTopicPartitions.stream()
             .map(TopicPartition::topic)

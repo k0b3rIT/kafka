@@ -185,7 +185,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
     final ExecutorService herderExecutor;
     // Visible for testing
     ExecutorService startAndStopExecutor;
-    private final WorkerGroupMember member;
+    protected final WorkerGroupMember member;
     private final AtomicBoolean stopping;
     private final boolean isTopicTrackingEnabled;
 
@@ -1726,7 +1726,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
     /**
      * Get the URL for the leader's REST interface, or null if we do not have the leader's URL yet.
      */
-    private String leaderUrl() {
+    protected String leaderUrl() {
         if (assignment == null)
             return null;
         return assignment.leaderUrl();
@@ -2363,7 +2363,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
         return addRequest(0, action, callback);
     }
 
-    DistributedHerderRequest addRequest(long delayMs, Callable<Void> action, Callback<Void> callback) {
+    protected DistributedHerderRequest addRequest(long delayMs, Callable<Void> action, Callback<Void> callback) {
         callback.recordStage(tickThreadStage);
         DistributedHerderRequest req = new DistributedHerderRequest(time.milliseconds() + delayMs, requestSeqNum.incrementAndGet(), action, callback);
         requests.add(req);
@@ -2575,7 +2575,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
         }
     }
 
-    private static Callback<Void> forwardErrorAndTickThreadStages(final Callback<?> callback) {
+    protected static Callback<Void> forwardErrorAndTickThreadStages(final Callback<?> callback) {
         Callback<Void> cb = callback.chainStaging((error, result) -> {
             if (error != null)
                 callback.onCompletion(error, null);

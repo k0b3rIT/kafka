@@ -112,6 +112,7 @@ public class HerderRequestHandler {
                     queryParameters.forEach(uriBuilder::queryParam);
                 }
                 String forwardUrl = uriBuilder.build().toString();
+                System.out.println("FORWARD############");
                 log.debug("Forwarding request {} {} {}", forwardUrl, method, body);
                 // TODO, we may need to set the request timeout as Idle timeout on the HttpClient
                 return translator.translate(restClient.httpRequest(forwardUrl, method, headers, body, resultType));

@@ -389,6 +389,10 @@ public final class Worker {
         }
     }
 
+    public WorkerConnector getConnector(String connName) {
+        return connectors.get(connName);
+    }
+
     /**
      * Get a list of updated task properties for the tasks of this connector.
      *

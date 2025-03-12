@@ -16,8 +16,11 @@
  */
 package org.apache.kafka.connect.mirror.rest;
 
+import org.apache.kafka.connect.mirror.MirrorHerder;
 import org.apache.kafka.connect.mirror.SourceAndTarget;
 import org.apache.kafka.connect.mirror.rest.resources.InternalMirrorResource;
+import org.apache.kafka.connect.mirror.rest.resources.MirrorHerderResource;
+import org.apache.kafka.connect.mirror.rest.resources.MirrorResource;
 import org.apache.kafka.connect.runtime.Herder;
 import org.apache.kafka.connect.runtime.rest.RestClient;
 import org.apache.kafka.connect.runtime.rest.RestServer;
@@ -27,29 +30,36 @@ import org.glassfish.hk2.api.TypeLiteral;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class MirrorRestServer extends RestServer {
 
     private final RestClient restClient;
-    private Map<SourceAndTarget, Herder> herders;
+    private Map<SourceAndTarget, MirrorHerder> herders;
 
-    public MirrorRestServer(Map<?, ?> props, RestClient restClient) {
-        super(RestServerConfig.forInternal(props));
+    private Map<String, Object> props;
+
+    public MirrorRestServer(Map<String, Object> props, RestClient restClient) {
+        super(RestServerConfig.forPublic(10000, props));
         this.restClient = restClient;
+        this.props = props;
     }
 
-    public void initializeInternalResources(Map<SourceAndTarget, Herder> herders) {
+    public void initializeInternalResources(Map<SourceAndTarget, MirrorHerder> herders) {
         this.herders = herders;
         super.initializeResources();
     }
 
     @Override
     protected Collection<Class<?>> regularResources() {
-        return Collections.singletonList(
-                InternalMirrorResource.class
+        return Arrays.asList(
+                InternalMirrorResource.class,
+                MirrorHerderResource.class,
+                MirrorResource.class
         );
     }
 
@@ -60,14 +70,18 @@ public class MirrorRestServer extends RestServer {
 
     @Override
     protected void configureRegularResources(ResourceConfig resourceConfig) {
+        if (!herders.isEmpty()) {
+            registerRestExtensions(herders.values().stream().collect(Collectors.toList()).get(0).plugins(), resourceConfig);
+        }
         resourceConfig.register(new Binder());
     }
 
     private class Binder extends AbstractBinder {
         @Override
         protected void configure() {
-            bind(herders).to(new TypeLiteral<Map<SourceAndTarget, Herder>>() { });
+            bind(herders).to(new TypeLiteral<Map<SourceAndTarget, MirrorHerder>>() { });
             bind(restClient).to(RestClient.class);
+            bind(props).to(new TypeLiteral<Map<String, Object>>() { });
         }
     }
 

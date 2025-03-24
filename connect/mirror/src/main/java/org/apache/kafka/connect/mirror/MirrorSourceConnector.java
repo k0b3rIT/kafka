@@ -388,15 +388,7 @@ public class MirrorSourceConnector extends SourceConnector {
 
         knownTargetTopicPartitions = targetTopicPartitions;
 
-        Map<String, String> upstreamToDownstreamTopics = sourceTopicPartitionsSet
-                .stream()
-                .map(TopicPartition::topic)
-                .distinct()
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        topic -> replicationPolicy.formatRemoteTopic(sourceAndTarget.source(), topic)
-                ));
-        topicListener.topicsChanged(upstreamToDownstreamTopics);
+        notifyTopicListener(sourceTopicPartitionsSet);
 
         // Detect if topic-partitions were added or deleted from the source cluster
         // or if topic-partitions are missing from the target cluster
@@ -425,10 +417,24 @@ public class MirrorSourceConnector extends SourceConnector {
         }
     }
 
+    private void notifyTopicListener(Collection<TopicPartition> topicPartitions) {
+        Map<String, String> upstreamToDownstreamTopics = topicPartitions
+                .stream()
+                .map(TopicPartition::topic)
+                .distinct()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        topic -> replicationPolicy.formatRemoteTopic(sourceAndTarget.source(), topic)
+                ));
+        topicListener.topicsChanged(upstreamToDownstreamTopics);
+    }
+
     private void loadTopicPartitions()
             throws InterruptedException, ExecutionException {
         knownSourceTopicPartitions = findSourceTopicPartitions();
         knownTargetTopicPartitions = findTargetTopicPartitions();
+
+        notifyTopicListener(knownSourceTopicPartitions);
     }
 
     private void refreshKnownTargetTopics()

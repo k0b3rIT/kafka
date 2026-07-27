@@ -54,6 +54,25 @@ import javax.net.ssl.SSLException;
 public class SslFactory implements Reconfigurable, Closeable {
     private static final Logger log = LoggerFactory.getLogger(SslFactory.class);
 
+    /**
+     * Maps each separate CLIENT-mode store config to the base {@code ssl.*} config it overrides.
+     * When this factory is in {@link ConnectionMode#CLIENT} mode, a non-null client value replaces
+     * the base value before the store material reaches the {@link SslEngineFactory}, allowing a
+     * broker to present a client-only (clientAuth EKU) certificate for connections it initiates while
+     * its listener uses a separate server-only certificate. Unset client keys fall back to the base.
+     */
+    private static final Map<String, String> CLIENT_STORE_CONFIG_OVERRIDES = Map.of(
+            SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_CONFIG, SslConfigs.SSL_KEYSTORE_TYPE_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG, SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_CONFIG, SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG,
+            SslConfigs.SSL_CLIENT_KEY_PASSWORD_CONFIG, SslConfigs.SSL_KEY_PASSWORD_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_KEY_CONFIG, SslConfigs.SSL_KEYSTORE_KEY_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_CONFIG, SslConfigs.SSL_KEYSTORE_CERTIFICATE_CHAIN_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG, SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG, SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG, SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_CERTIFICATES_CONFIG, SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG);
+
     private final ConnectionMode connectionMode;
     private final String clientAuthConfigOverride;
     private final boolean keystoreVerifiableUsingTruststore;
@@ -95,10 +114,26 @@ public class SslFactory implements Reconfigurable, Closeable {
         if (clientAuthConfigOverride != null) {
             nextConfigs.put(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG, clientAuthConfigOverride);
         }
+        // Persist the raw (un-remapped) config so the reconfigure path and cross-store validation can
+        // still resolve the server-role store even after the in-place CLIENT-mode remap below.
+        this.sslEngineFactoryConfig = new HashMap<>(nextConfigs);
+        // In CLIENT mode, remap any configured ssl.client.* store values onto the base ssl.* keys so
+        // the engine factory (which only understands the base keys) uses the client-role store. The
+        // remap is applied in place so the runtime factory still sees the production RecordingMap.
+        if (connectionMode == ConnectionMode.CLIENT) {
+            applyClientConfigOverrides(nextConfigs);
+        }
         SslEngineFactory builder = instantiateSslEngineFactory(nextConfigs);
         if (keystoreVerifiableUsingTruststore) {
             try {
-                SslEngineValidator.validate(builder, builder);
+                if (hasSeparateClientStore(nextConfigs)) {
+                    // A separate client store is configured (single-purpose EKU certs): the server-role
+                    // and client-role stores each hold a certificate valid for only one role, so validate
+                    // the server store as a server against the client store acting as the client.
+                    runCrossStoreValidation(this.sslEngineFactoryConfig, builder);
+                } else {
+                    SslEngineValidator.validate(builder, builder);
+                }
             } catch (Exception e) {
                 throw new ConfigException("A client SSLEngine created with the provided settings " +
                         "can't connect to a server SSLEngine created with those settings.", e);
@@ -132,10 +167,14 @@ public class SslFactory implements Reconfigurable, Closeable {
         }
     }
 
+    /**
+     * Instantiates and configures an {@link SslEngineFactory} from the given (already fully resolved)
+     * configs. Callers are responsible for applying any {@code ssl.client.*} store overrides before
+     * calling this (see {@link #applyClientConfigOverrides}).
+     */
     private SslEngineFactory instantiateSslEngineFactory(Map<String, Object> configs) {
         @SuppressWarnings("unchecked")
-        Class<? extends SslEngineFactory> sslEngineFactoryClass =
-                (Class<? extends SslEngineFactory>) configs.get(SslConfigs.SSL_ENGINE_FACTORY_CLASS_CONFIG);
+        Class<? extends SslEngineFactory> sslEngineFactoryClass = (Class<? extends SslEngineFactory>) configs.get(SslConfigs.SSL_ENGINE_FACTORY_CLASS_CONFIG);
         SslEngineFactory sslEngineFactory;
         if (sslEngineFactoryClass == null) {
             sslEngineFactory = new DefaultSslEngineFactory();
@@ -143,24 +182,93 @@ public class SslFactory implements Reconfigurable, Closeable {
             sslEngineFactory = Utils.newInstance(sslEngineFactoryClass);
         }
         sslEngineFactory.configure(configs);
-        this.sslEngineFactoryConfig = configs;
         return sslEngineFactory;
+    }
+
+    /**
+     * Overrides the base {@code ssl.*} store configs with any non-null {@code ssl.client.*} counterparts
+     * (see {@link #CLIENT_STORE_CONFIG_OVERRIDES}), so the engine factory (which only understands the base
+     * keys) uses the client-role store. Idempotent, so it is safe to call on both the initial and
+     * reconfigure paths. Mutates and returns {@code configs}.
+     *
+     * <p>Callers decide when this applies: the normal paths call it only in {@link ConnectionMode#CLIENT}
+     * mode (SERVER mode keeps the base store), while the inter-broker cross-store validation calls it
+     * unconditionally to build the transient client-store factory while this factory is in SERVER mode.
+     */
+    private static Map<String, Object> applyClientConfigOverrides(Map<String, Object> configs) {
+        for (Map.Entry<String, String> override : CLIENT_STORE_CONFIG_OVERRIDES.entrySet()) {
+            Object clientValue = configs.get(override.getKey());
+            if (clientValue != null) {
+                configs.put(override.getValue(), clientValue);
+            }
+        }
+        return configs;
+    }
+
+    /**
+     * @return true if a separate CLIENT-mode keystore is configured (its location or inline PEM key).
+     * Detection keys off the keystore only: a separate client truststore alone does not require the
+     * cross-store validation path.
+     */
+    private static boolean hasSeparateClientStore(Map<String, Object> configs) {
+        return configs.get(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG) != null
+                || configs.get(SslConfigs.SSL_CLIENT_KEYSTORE_KEY_CONFIG) != null;
+    }
+
+    /**
+     * Runs the inter-broker cross-store validation handshake for single-purpose EKU certificates: the
+     * server engine is always built from the server-role (base {@code ssl.*}) store and the client
+     * engine from the client-role ({@code ssl.client.*}) store, independent of this factory's
+     * {@link #connectionMode}. {@code runtimeFactory} is the already-built factory for this mode's store
+     * (the client store in CLIENT mode, the server store otherwise) and is reused for the matching side;
+     * a single transient factory is built for the other side and closed afterwards.
+     *
+     * @param rawConfigs the un-remapped config (holds both {@code ssl.*} and {@code ssl.client.*} keys)
+     */
+    private void runCrossStoreValidation(Map<String, Object> rawConfigs, SslEngineFactory runtimeFactory) throws SSLException {
+        SslEngineFactory serverBuilder;
+        SslEngineFactory clientBuilder;
+        SslEngineFactory transientFactory;
+        if (connectionMode == ConnectionMode.CLIENT) {
+            // runtimeFactory is the client store; build the server store from the raw (un-remapped) config.
+            clientBuilder = runtimeFactory;
+            serverBuilder = transientFactory = instantiateSslEngineFactory(new HashMap<>(rawConfigs));
+        } else {
+            // runtimeFactory is the server store; build the client store by applying the client overrides.
+            serverBuilder = runtimeFactory;
+            clientBuilder = transientFactory = instantiateSslEngineFactory(applyClientConfigOverrides(new HashMap<>(rawConfigs)));
+        }
+        try {
+            SslEngineValidator.validateCrossStore(serverBuilder, clientBuilder);
+        } finally {
+            Utils.closeQuietly(transientFactory, "close transient ssl engine factory");
+        }
     }
 
     private SslEngineFactory createNewSslEngineFactory(Map<String, ?> newConfigs) {
         if (sslEngineFactory == null) {
             throw new IllegalStateException("SslFactory has not been configured.");
         }
+        // nextConfigs is the raw (un-remapped) config: sslEngineFactoryConfig holds the raw map and
+        // copyMapEntries overlays the raw base + ssl.client.* values from newConfigs. It is persisted
+        // as-is below so the server-role store survives for the next reconfigure / cross-store check.
         Map<String, Object> nextConfigs = new HashMap<>(sslEngineFactoryConfig);
         copyMapEntries(nextConfigs, newConfigs, reconfigurableConfigs());
         if (clientAuthConfigOverride != null) {
             nextConfigs.put(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG, clientAuthConfigOverride);
         }
-        if (!sslEngineFactory.shouldBeRebuilt(nextConfigs)) {
+        // Build this mode's store view (client store in CLIENT mode, raw server store otherwise) to
+        // match what the live engine factory holds, so shouldBeRebuilt compares like-for-like and the
+        // rebuilt runtime factory uses the correct store.
+        Map<String, Object> runtimeConfigs = connectionMode == ConnectionMode.CLIENT
+                ? applyClientConfigOverrides(new HashMap<>(nextConfigs))
+                : nextConfigs;
+        if (!sslEngineFactory.shouldBeRebuilt(runtimeConfigs)) {
             return sslEngineFactory;
         }
         try {
-            SslEngineFactory newSslEngineFactory = instantiateSslEngineFactory(nextConfigs);
+            SslEngineFactory newSslEngineFactory = instantiateSslEngineFactory(runtimeConfigs);
+            this.sslEngineFactoryConfig = nextConfigs;
             if (sslEngineFactory.keystore() == null) {
                 if (newSslEngineFactory.keystore() != null) {
                     throw new ConfigException("Cannot add SSL keystore to an existing listener for " +
@@ -183,7 +291,11 @@ public class SslFactory implements Reconfigurable, Closeable {
             }
             if (keystoreVerifiableUsingTruststore) {
                 if (sslEngineFactory.truststore() != null || sslEngineFactory.keystore() != null) {
-                    SslEngineValidator.validate(sslEngineFactory, newSslEngineFactory);
+                    if (hasSeparateClientStore(nextConfigs)) {
+                        runCrossStoreValidation(nextConfigs, newSslEngineFactory);
+                    } else {
+                        SslEngineValidator.validate(sslEngineFactory, newSslEngineFactory);
+                    }
                 }
             }
             return newSslEngineFactory;
@@ -412,6 +524,20 @@ public class SslFactory implements Reconfigurable, Closeable {
                     createSslEngineForValidation(newEngineBuilder, ConnectionMode.CLIENT));
             validate(createSslEngineForValidation(newEngineBuilder, ConnectionMode.SERVER),
                     createSslEngineForValidation(oldEngineBuilder, ConnectionMode.CLIENT));
+        }
+
+        /**
+         * Validates that a handshake succeeds between a server engine built from the server-role store
+         * and a client engine built from a separate client-role store. Used when single-purpose EKU
+         * certificates are configured, where each store holds a certificate valid for only one role, so
+         * the symmetric {@link #validate(SslEngineFactory, SslEngineFactory)} self-handshake would fail.
+         * Since all brokers share the same configuration, this single directional handshake models the
+         * inter-broker connection between two peers (one acting as server, the other as client).
+         */
+        static void validateCrossStore(SslEngineFactory serverStoreFactory,
+                                       SslEngineFactory clientStoreFactory) throws SSLException {
+            validate(createSslEngineForValidation(clientStoreFactory, ConnectionMode.CLIENT),
+                    createSslEngineForValidation(serverStoreFactory, ConnectionMode.SERVER));
         }
 
         private static SSLEngine createSslEngineForValidation(SslEngineFactory sslEngineFactory, ConnectionMode connectionMode) {

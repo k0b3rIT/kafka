@@ -20,6 +20,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.SecurityConfig;
 import org.apache.kafka.common.config.SslConfigs;
+import org.apache.kafka.common.config.internals.BrokerSecurityConfigs;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.network.ConnectionMode;
 import org.apache.kafka.common.security.TestSecurityConfig;
@@ -38,12 +39,15 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -576,6 +580,224 @@ public abstract class SslFactoryTest {
         assertThrows(ConfigException.class, () -> ensureCompatible(ks, createKeyStore(keyPair, "*.example.com", "Kafka", true, "localhost", "*.another.example.com"), true, false));
         ensureCompatible(ks, createKeyStore(keyPair, "*.another.example.com", "Kafka", true, "localhost", "*.example.com"), true, false);
         assertThrows(ConfigException.class, () -> ensureCompatible(ks, createKeyStore(keyPair, "*.another.example.com", "Kafka", true, "localhost", "*.example.com"), false, true));
+    }
+
+    @Test
+    public void testClientModeUsesSeparateClientStore() throws Exception {
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.CLIENT)) {
+            sslFactory.configure(config);
+            // In CLIENT mode the ssl.client.keystore.* store (alias "client") must win over the base store.
+            assertTrue(sslFactory.sslEngineFactory().keystore().containsAlias("client"),
+                    "CLIENT-mode factory should use the separate client keystore");
+            assertFalse(sslFactory.sslEngineFactory().keystore().containsAlias("server"));
+        }
+    }
+
+    @Test
+    public void testServerModeIgnoresClientStore() throws Exception {
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.SERVER)) {
+            sslFactory.configure(config);
+            // In SERVER mode the ssl.client.* keys must be ignored; the base keystore (alias "server") is used.
+            assertTrue(sslFactory.sslEngineFactory().keystore().containsAlias("server"),
+                    "SERVER-mode factory should use the base keystore and ignore ssl.client.* keys");
+            assertFalse(sslFactory.sslEngineFactory().keystore().containsAlias("client"));
+        }
+    }
+
+    @Test
+    public void testClientStorePerKeyFallbackToBaseTruststore() throws Exception {
+        // Configure a separate client keystore but leave the client truststore unset: it must fall back
+        // to the base truststore (which trusts both certs), while the keystore uses the client store.
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        config.remove(SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG);
+        config.remove(SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG);
+        config.remove(SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG);
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.CLIENT)) {
+            sslFactory.configure(config);
+            assertTrue(sslFactory.sslEngineFactory().keystore().containsAlias("client"));
+            // Client truststore unset, so it falls back to the base truststore (which holds the CA).
+            assertTrue(sslFactory.sslEngineFactory().truststore().containsAlias("ca"));
+        }
+    }
+
+    @Test
+    public void testInterBrokerServerValidationWithSinglePurposeCerts() throws Exception {
+        // The inter-broker SERVER listener validates via a self-handshake. With single-purpose EKU certs,
+        // a separate client store lets the cross-store validation succeed: server store (serverAuth-only)
+        // acts as server, the client store (clientAuth-only) acts as client.
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        config.put(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG, "required");
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.SERVER, null, true)) {
+            sslFactory.configure(config);
+            assertNotNull(sslFactory.sslEngineFactory());
+        }
+    }
+
+    @Test
+    public void testSinglePurposeServerCertWithoutClientStoreFailsValidation() throws Exception {
+        // Negative control: without a separate client store, the symmetric self-handshake presents the
+        // serverAuth-only cert as a client cert, which JSSE rejects (clientAuth EKU missing).
+        Map<String, Object> config = singlePurposeEkuConfig(false);
+        config.put(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG, "required");
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.SERVER, null, true)) {
+            assertThrows(ConfigException.class, () -> sslFactory.configure(config));
+        }
+    }
+
+    @Test
+    public void testClientStoreReconfiguration() throws Exception {
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.CLIENT)) {
+            sslFactory.configure(config);
+            SslEngineFactory engineFactory = sslFactory.sslEngineFactory();
+            assertNotNull(engineFactory);
+
+            // Reconfigure with an identical config must not rebuild (guards the remap/equality concern:
+            // copyMapEntries copies raw base+client values, so the client override must be re-applied
+            // before shouldBeRebuilt or CLIENT mode would rebuild on every reconfigure).
+            sslFactory.reconfigure(new HashMap<>(config));
+            assertSame(engineFactory, sslFactory.sslEngineFactory(),
+                    "SslEngineFactory recreated unnecessarily on no-op reconfigure");
+
+            // Changing the client keystore location rebuilds the engine factory. The replacement cert
+            // keeps the same DN/SANs so it passes CertificateEntries.ensureCompatible, and the same
+            // store password so DefaultSslEngineFactory can load it. CLIENT mode does not run the
+            // truststore self-handshake, so a self-signed cert is sufficient here.
+            File newClientKeyStore = TestUtils.tempFile("client-ks", ".jks");
+            KeyPair clientKeyPair = TestSslUtils.generateKeyPair("RSA");
+            X509Certificate clientCert = TestSslUtils.generateSignedCertificate(
+                    SINGLE_PURPOSE_CLIENT_DN, clientKeyPair, 0, 365, null, null,
+                    "SHA256withRSA", false, false, true, new String[] {"localhost"});
+            TestSslUtils.createKeyStore(newClientKeyStore.getPath(), SINGLE_PURPOSE_STORE_PASSWORD,
+                    SINGLE_PURPOSE_STORE_PASSWORD, "client", clientKeyPair.getPrivate(), clientCert);
+            Map<String, Object> newConfig = new HashMap<>(config);
+            newConfig.put(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG, newClientKeyStore.getPath());
+            sslFactory.reconfigure(newConfig);
+            assertNotSame(engineFactory, sslFactory.sslEngineFactory(),
+                    "SslEngineFactory not recreated after client keystore change");
+        }
+    }
+
+    @Test
+    public void testClientModeCrossStoreValidationUsesServerStore() throws Exception {
+        // A CLIENT-mode factory with keystore verification enabled must run the cross-store validation
+        // with the server-role (base) store as the server side, even though its runtime factory uses the
+        // client store. With single-purpose EKU certs this only succeeds if the server side presents the
+        // serverAuth-only cert; using the client (clientAuth-only) store there would fail the serverAuth
+        // EKU check and throw ConfigException.
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        config.put(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG, "required");
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.CLIENT, null, true)) {
+            sslFactory.configure(config);
+            assertNotNull(sslFactory.sslEngineFactory());
+            // The runtime factory itself uses the client store (client-role certificate).
+            assertTrue(sslFactory.sslEngineFactory().keystore().containsAlias("client"));
+            assertFalse(sslFactory.sslEngineFactory().keystore().containsAlias("server"));
+        }
+    }
+
+    @Test
+    public void testClientModeCrossStoreReconfiguration() throws Exception {
+        Map<String, Object> config = singlePurposeEkuConfig(true);
+        config.put(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG, "required");
+        try (SslFactory sslFactory = new SslFactory(ConnectionMode.CLIENT, null, true)) {
+            // configure() remaps ssl.client.* onto the base ssl.* keys in place, so hand it a copy and
+            // keep `config` pristine — mirroring production, where reconfigure receives a fresh broker
+            // config whose base ssl.keystore.location is always the (server-role) keystore.
+            sslFactory.configure(new HashMap<>(config));
+            SslEngineFactory engineFactory = sslFactory.sslEngineFactory();
+            assertNotNull(engineFactory);
+
+            // No-op reconfigure must not rebuild.
+            sslFactory.reconfigure(new HashMap<>(config));
+            assertSame(engineFactory, sslFactory.sslEngineFactory(),
+                    "SslEngineFactory recreated unnecessarily on no-op reconfigure");
+
+            // Rotating the client keystore location rebuilds and re-runs cross-store validation with the
+            // server store as the server side. Copy the existing client store to a new path so the cert
+            // stays CA-signed (trusted by the server-side CA-only truststore) and passes ensureCompatible.
+            String origClientKeyStore = (String) config.get(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG);
+            File newClientKeyStore = TestUtils.tempFile("client-ks", ".jks");
+            Files.copy(new File(origClientKeyStore).toPath(), newClientKeyStore.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
+            Map<String, Object> newConfig = new HashMap<>(config);
+            newConfig.put(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG, newClientKeyStore.getPath());
+            sslFactory.reconfigure(newConfig);
+            assertNotSame(engineFactory, sslFactory.sslEngineFactory(),
+                    "SslEngineFactory not recreated after client keystore change");
+        }
+    }
+
+    private static final Password SINGLE_PURPOSE_STORE_PASSWORD = new Password("StorePassword");
+    private static final String SINGLE_PURPOSE_CA_DN = "CN=ca, O=Kafka";
+    private static final String SINGLE_PURPOSE_CLIENT_DN = "CN=localhost, O=A client";
+
+    /**
+     * Builds an SSL config with single-purpose EKU certificates: a serverAuth-only cert in the base
+     * keystore (alias "server") and a clientAuth-only cert in the client keystore (alias "client").
+     * Both leaf certs are signed by a common CA and the truststore holds only that CA, so the leaves
+     * are validated as end-entities — which is what triggers JSSE's per-role EKU enforcement (a leaf
+     * placed directly in the truststore would be treated as a trust anchor and skip the EKU check).
+     * When {@code withClientStore} is true the {@code ssl.client.*} keystore/truststore keys are
+     * populated; otherwise only the base store is set.
+     */
+    private Map<String, Object> singlePurposeEkuConfig(boolean withClientStore) throws Exception {
+        Password storePassword = SINGLE_PURPOSE_STORE_PASSWORD;
+        Password trustPassword = new Password(TestSslUtils.TRUST_STORE_PASSWORD);
+
+        // CA that signs both leaf certificates.
+        KeyPair caKeyPair = TestSslUtils.generateKeyPair("RSA");
+        X509Certificate caCert = TestSslUtils.generateSignedCertificate(
+                SINGLE_PURPOSE_CA_DN, caKeyPair, 0, 365, null, null,
+                "SHA256withRSA", true, false, false);
+
+        KeyPair serverKeyPair = TestSslUtils.generateKeyPair("RSA");
+        X509Certificate serverCert = TestSslUtils.generateSignedCertificate(
+                "CN=localhost, O=A server", serverKeyPair, 0, 365, SINGLE_PURPOSE_CA_DN, caKeyPair,
+                "SHA256withRSA", false, true, false, new String[] {"localhost"});
+        File serverKeyStore = TestUtils.tempFile("server-ks", ".jks");
+        TestSslUtils.createKeyStore(serverKeyStore.getPath(), storePassword, storePassword,
+                "server", serverKeyPair.getPrivate(), serverCert);
+
+        KeyPair clientKeyPair = TestSslUtils.generateKeyPair("RSA");
+        X509Certificate clientCert = TestSslUtils.generateSignedCertificate(
+                SINGLE_PURPOSE_CLIENT_DN, clientKeyPair, 0, 365, SINGLE_PURPOSE_CA_DN, caKeyPair,
+                "SHA256withRSA", false, false, true, new String[] {"localhost"});
+        File clientKeyStore = TestUtils.tempFile("client-ks", ".jks");
+        TestSslUtils.createKeyStore(clientKeyStore.getPath(), storePassword, storePassword,
+                "client", clientKeyPair.getPrivate(), clientCert);
+
+        File trustStore = TestUtils.tempFile("truststore", ".jks");
+        Map<String, X509Certificate> trusted = new HashMap<>();
+        trusted.put("ca", caCert);
+        TestSslUtils.createTrustStore(trustStore.getPath(), trustPassword, trusted);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put(SslConfigs.SSL_PROTOCOL_CONFIG, tlsProtocol);
+        config.put(SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, List.of(tlsProtocol));
+        // DefaultSslEngineFactory.configure reads the cipher-suites list without a null guard,
+        // so provide the ConfigDef default (empty list) as the parsed config would.
+        config.put(SslConfigs.SSL_CIPHER_SUITES_CONFIG, List.of());
+        config.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, "JKS");
+        config.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, serverKeyStore.getPath());
+        config.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, storePassword);
+        config.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, storePassword);
+        config.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, "JKS");
+        config.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, trustStore.getPath());
+        config.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, trustPassword);
+
+        if (withClientStore) {
+            config.put(SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_CONFIG, "JKS");
+            config.put(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG, clientKeyStore.getPath());
+            config.put(SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_CONFIG, storePassword);
+            config.put(SslConfigs.SSL_CLIENT_KEY_PASSWORD_CONFIG, storePassword);
+            config.put(SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG, "JKS");
+            config.put(SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG, trustStore.getPath());
+            config.put(SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG, trustPassword);
+        }
+        return config;
     }
 
     private KeyStore createKeyStore(KeyPair keyPair, String commonName, String org, boolean utf8, String... dnsNames) throws Exception {

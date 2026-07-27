@@ -101,6 +101,31 @@ class DynamicBrokerConfigTest {
   }
 
   @Test
+  def testClientKeystoreConfigResolution(): Unit = {
+    val props = TestUtils.createBrokerConfig(0, port = 8181)
+    val config = KafkaConfig(props)
+    val dynamicConfig = config.dynamicConfig
+    dynamicConfig.initialize(None)
+
+    // The separate ssl.client.* store keys default to null so unset keys fall back to the base ssl.*.
+    assertNull(config.values.get(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG))
+    assertNull(config.values.get(SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG))
+
+    // A listener-prefixed client keystore location must resolve against the base ConfigDef.
+    val props1 = new Properties
+    val clientKeystore = "clientKs.jks"
+    props1.put(s"listener.name.external.${SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG}", clientKeystore)
+    dynamicConfig.updateBrokerConfig(0, props1)
+
+    assertEquals(clientKeystore,
+      config.valuesWithPrefixOverride("listener.name.external.").get(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG))
+    assertEquals(clientKeystore,
+      config.originalsWithPrefix("listener.name.external.").get(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG))
+    // Non-prefixed lookup still resolves to the default (null) for this listener-scoped override.
+    assertNull(config.values.get(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG))
+  }
+
+  @Test
   def testUpdateDynamicThreadPool(): Unit = {
     val origProps = TestUtils.createBrokerConfig(0, port = 8181)
     origProps.put(ServerConfigs.NUM_IO_THREADS_CONFIG, "4")

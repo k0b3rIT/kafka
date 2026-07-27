@@ -117,6 +117,51 @@ public class SslConfigs {
     public static final String SSL_SECURE_RANDOM_IMPLEMENTATION_CONFIG = "ssl.secure.random.implementation";
     public static final String SSL_SECURE_RANDOM_IMPLEMENTATION_DOC = "The SecureRandom PRNG implementation to use for SSL cryptography operations. ";
 
+    // Separate keystore/truststore for CLIENT-mode connections (e.g. the inter-broker client role).
+    // These allow a broker to use a certificate with only the clientAuth EKU for connections it
+    // initiates, while its listener (server role) uses a separate serverAuth-only certificate. Each
+    // key falls back to the corresponding `ssl.*` config when left unset, so existing single-store
+    // deployments are unaffected. See DefaultSslEngineFactory and SslFactory for how these are applied.
+    public static final String SSL_CLIENT_KEYSTORE_TYPE_CONFIG = "ssl.client.keystore.type";
+    public static final String SSL_CLIENT_KEYSTORE_TYPE_DOC = "The file format of the key store file used for CLIENT-mode connections "
+        + "(inter-broker client, producer, consumer, admin and Connect clients). Falls back to '" + SslConfigs.SSL_KEYSTORE_TYPE_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_KEYSTORE_KEY_CONFIG = "ssl.client.keystore.key";
+    public static final String SSL_CLIENT_KEYSTORE_KEY_DOC = "Private key (see '" + SslConfigs.SSL_KEYSTORE_KEY_CONFIG + "') used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_KEYSTORE_KEY_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_CONFIG = "ssl.client.keystore.certificate.chain";
+    public static final String SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_DOC = "Certificate chain (see '" + SslConfigs.SSL_KEYSTORE_CERTIFICATE_CHAIN_CONFIG + "') used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_KEYSTORE_CERTIFICATE_CHAIN_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_KEYSTORE_LOCATION_CONFIG = "ssl.client.keystore.location";
+    public static final String SSL_CLIENT_KEYSTORE_LOCATION_DOC = "The location of the key store file used for CLIENT-mode connections "
+        + "(inter-broker client, producer, consumer, admin and Connect clients). Falls back to '" + SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_KEYSTORE_PASSWORD_CONFIG = "ssl.client.keystore.password";
+    public static final String SSL_CLIENT_KEYSTORE_PASSWORD_DOC = "The store password for the key store file used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_KEY_PASSWORD_CONFIG = "ssl.client.key.password";
+    public static final String SSL_CLIENT_KEY_PASSWORD_DOC = "The password of the private key used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_KEY_PASSWORD_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG = "ssl.client.truststore.type";
+    public static final String SSL_CLIENT_TRUSTSTORE_TYPE_DOC = "The file format of the trust store file used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG = "ssl.client.truststore.location";
+    public static final String SSL_CLIENT_TRUSTSTORE_LOCATION_DOC = "The location of the trust store file used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG = "ssl.client.truststore.password";
+    public static final String SSL_CLIENT_TRUSTSTORE_PASSWORD_DOC = "The password for the trust store file used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG + "' when unset.";
+
+    public static final String SSL_CLIENT_TRUSTSTORE_CERTIFICATES_CONFIG = "ssl.client.truststore.certificates";
+    public static final String SSL_CLIENT_TRUSTSTORE_CERTIFICATES_DOC = "Trusted certificates (see '" + SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG + "') used for CLIENT-mode connections. "
+        + "Falls back to '" + SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG + "' when unset.";
+
     public static final String SSL_ENGINE_FACTORY_CLASS_CONFIG = "ssl.engine.factory.class";
     public static final String SSL_ENGINE_FACTORY_CLASS_DOC = "The class of type org.apache.kafka.common.security.auth.SslEngineFactory to provide SSLEngine objects. "
         + "Default value is org.apache.kafka.common.security.ssl.DefaultSslEngineFactory. "
@@ -144,7 +189,19 @@ public class SslConfigs {
                 .define(SslConfigs.SSL_TRUSTMANAGER_ALGORITHM_CONFIG, ConfigDef.Type.STRING, SslConfigs.DEFAULT_SSL_TRUSTMANAGER_ALGORITHM, ConfigDef.Importance.LOW, SslConfigs.SSL_TRUSTMANAGER_ALGORITHM_DOC)
                 .define(SslConfigs.SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_CONFIG, ConfigDef.Type.STRING, SslConfigs.DEFAULT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM, ConfigDef.Importance.LOW, SslConfigs.SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_DOC)
                 .define(SslConfigs.SSL_SECURE_RANDOM_IMPLEMENTATION_CONFIG, ConfigDef.Type.STRING, null, ConfigDef.Importance.LOW, SslConfigs.SSL_SECURE_RANDOM_IMPLEMENTATION_DOC)
-                .define(SslConfigs.SSL_ENGINE_FACTORY_CLASS_CONFIG, ConfigDef.Type.CLASS, null, ConfigDef.Importance.LOW, SslConfigs.SSL_ENGINE_FACTORY_CLASS_DOC);
+                .define(SslConfigs.SSL_ENGINE_FACTORY_CLASS_CONFIG, ConfigDef.Type.CLASS, null, ConfigDef.Importance.LOW, SslConfigs.SSL_ENGINE_FACTORY_CLASS_DOC)
+                // Separate CLIENT-mode store configs. All default to null so an unset key falls back
+                // to the corresponding base `ssl.*` config (see SslFactory#applyClientConfigOverrides).
+                .define(SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_CONFIG, ConfigDef.Type.STRING, null, ConfigDef.Importance.MEDIUM, SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_DOC)
+                .define(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_DOC)
+                .define(SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_CONFIG, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_DOC)
+                .define(SslConfigs.SSL_CLIENT_KEY_PASSWORD_CONFIG, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_KEY_PASSWORD_DOC)
+                .define(SslConfigs.SSL_CLIENT_KEYSTORE_KEY_CONFIG, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_KEYSTORE_KEY_DOC)
+                .define(SslConfigs.SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_CONFIG, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_DOC)
+                .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_CERTIFICATES_CONFIG, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_TRUSTSTORE_CERTIFICATES_DOC)
+                .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG, ConfigDef.Type.STRING, null, ConfigDef.Importance.MEDIUM, SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_DOC)
+                .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_DOC)
+                .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH, SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_DOC);
     }
 
     public static final Set<String> RECONFIGURABLE_CONFIGS = Set.of(
@@ -157,7 +214,17 @@ public class SslConfigs {
             SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG,
             SslConfigs.SSL_KEYSTORE_CERTIFICATE_CHAIN_CONFIG,
             SslConfigs.SSL_KEYSTORE_KEY_CONFIG,
-            SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG);
+            SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_CONFIG,
+            SslConfigs.SSL_CLIENT_KEY_PASSWORD_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_CONFIG,
+            SslConfigs.SSL_CLIENT_KEYSTORE_KEY_CONFIG,
+            SslConfigs.SSL_CLIENT_TRUSTSTORE_CERTIFICATES_CONFIG);
 
     public static final Set<String> NON_RECONFIGURABLE_CONFIGS = Set.of(
             BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG,

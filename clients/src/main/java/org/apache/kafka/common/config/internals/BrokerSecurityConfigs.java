@@ -171,6 +171,18 @@ public class BrokerSecurityConfigs {
             .define(SslConfigs.SSL_SECURE_RANDOM_IMPLEMENTATION_CONFIG, STRING, null, LOW, SslConfigs.SSL_SECURE_RANDOM_IMPLEMENTATION_DOC)
             .define(SslConfigs.SSL_CIPHER_SUITES_CONFIG, LIST, List.of(), ConfigDef.ValidList.anyNonDuplicateValues(true, false), MEDIUM, SslConfigs.SSL_CIPHER_SUITES_DOC)
             .define(SslConfigs.SSL_ENGINE_FACTORY_CLASS_CONFIG, CLASS, null, LOW, SslConfigs.SSL_ENGINE_FACTORY_CLASS_DOC)
+            // Separate CLIENT-mode store configs (e.g. inter-broker client role). All default to null so
+            // an unset key falls back to the corresponding base `ssl.*` config; see SslFactory#applyClientConfigOverrides.
+            .define(SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_CONFIG, STRING, null, MEDIUM, SslConfigs.SSL_CLIENT_KEYSTORE_TYPE_DOC)
+            .define(SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_CONFIG, STRING, null, MEDIUM, SslConfigs.SSL_CLIENT_KEYSTORE_LOCATION_DOC)
+            .define(SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_CONFIG, PASSWORD, null, MEDIUM, SslConfigs.SSL_CLIENT_KEYSTORE_PASSWORD_DOC)
+            .define(SslConfigs.SSL_CLIENT_KEY_PASSWORD_CONFIG, PASSWORD, null, MEDIUM, SslConfigs.SSL_CLIENT_KEY_PASSWORD_DOC)
+            .define(SslConfigs.SSL_CLIENT_KEYSTORE_KEY_CONFIG, PASSWORD, null, MEDIUM, SslConfigs.SSL_CLIENT_KEYSTORE_KEY_DOC)
+            .define(SslConfigs.SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_CONFIG, PASSWORD, null, MEDIUM, SslConfigs.SSL_CLIENT_KEYSTORE_CERTIFICATE_CHAIN_DOC)
+            .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_CONFIG, STRING, null, MEDIUM, SslConfigs.SSL_CLIENT_TRUSTSTORE_TYPE_DOC)
+            .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_CONFIG, STRING, null, MEDIUM, SslConfigs.SSL_CLIENT_TRUSTSTORE_LOCATION_DOC)
+            .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_CONFIG, PASSWORD, null, MEDIUM, SslConfigs.SSL_CLIENT_TRUSTSTORE_PASSWORD_DOC)
+            .define(SslConfigs.SSL_CLIENT_TRUSTSTORE_CERTIFICATES_CONFIG, PASSWORD, null, MEDIUM, SslConfigs.SSL_CLIENT_TRUSTSTORE_CERTIFICATES_DOC)
 
             // Sasl Configuration
             .define(BrokerSecurityConfigs.SASL_MECHANISM_INTER_BROKER_PROTOCOL_CONFIG, STRING, SaslConfigs.DEFAULT_SASL_MECHANISM, MEDIUM, BrokerSecurityConfigs.SASL_MECHANISM_INTER_BROKER_PROTOCOL_DOC)
